@@ -45,8 +45,8 @@ SQL_SENSOR_DEL = """
 
 SQL_SENSOR_ALL = """
     SELECT sid
-    FROM sensor"""
-
+    FROM sensor
+    ORDER BY sid"""
 
 SQL_SENSOR_TOKEN = """
     SELECT token
@@ -73,6 +73,12 @@ SQL_TMPO_CLEAN = """
     DELETE
     FROM tmpo
     WHERE sid = ? AND rid = ? AND lvl = ? AND bid <= ?"""
+
+SQL_TMPO_ALL = """
+    SELECT sid, rid, lvl, bid, ext, created, data
+    FROM tmpo
+    WHERE sid = ?
+    ORDER BY rid ASC, lvl DESC, bid ASC"""
 
 SQL_TMPO_LAST = """
     SELECT rid, lvl, bid
@@ -153,7 +159,13 @@ class Session():
             sids = [sid for (sid,) in self.dbcur.execute(SQL_SENSOR_ALL)]
         slist = []
         for sid in sids:
-            return
+            tlist = []
+            for tmpo in self.dbcur.execute(SQL_TMPO_ALL, (sid,)):
+                tlist.append(tmpo)
+                sid, rid, lvl, bid, ext, ctd, blk = tmpo
+                self._dprintf(DBG_TMPO_SINK, ctd, sid, rid, lvl, bid, len(blk))
+            slist.append(tlist)
+        return slist
 
     def _rqsync(self, sid, rid, lvl, bid):
         self.dbcur.execute(SQL_SENSOR_TOKEN, (sid,))
@@ -165,13 +177,13 @@ class Session():
             "rid": rid,
             "lvl": lvl,
             "bid": bid}
-        for b in self.rqs.get(
+        r = self.rqs.get(
             API_TMPO_SYNC % (self.host, sid),
             headers=headers,
             params=params,
             verify=self.crt)
-        .json():
-            self._rqblock(sid, token, b["rid"], b["lvl"], b["bid"], b["ext"])
+        for t in r.json():
+            self._rqblock(sid, token, t["rid"], t["lvl"], t["bid"], t["ext"])
 
     def _rqblock(self, sid, token, rid, lvl, bid, ext):
         headers = {
