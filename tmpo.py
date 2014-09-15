@@ -94,15 +94,26 @@ HTTP_ACCEPT = {
     "json": "application/json",
     "gz": "application/gzip"}
 
+RE_JSON_BLK = r'^\{"h":(?P<h>\{.+?\}),"t":(?P<t>\[.+?\]),"v":(?P<v>\[.+?\])\}$'
 DBG_TMPO_SINK = "time:%.3f sid:%s rid:%d lvl:%2d bid:%d size[B]:%d"
 
 
 import os
+import sys
 import io
 import math
 import time
 import sqlite3
 import requests
+import zlib
+import re
+import json
+import numpy as np
+import pandas as pd
+
+
+class TmpoError(Exception):
+    pass
 
 
 class Session():
@@ -167,6 +178,40 @@ class Session():
             slist.append(tlist)
         return slist
 
+    def series(self, sid, head=0, tail=sys.maxint):
+        tlist = self.list(sid)[0]
+        srlist = []
+        for _sid, rid, lvl, bid, ext, ctd, blk in tlist:
+            if head < self._blocktail(lvl, bid) and tail >= bid:
+                srlist.append(self._blk2series(ext, blk, head, tail))
+        return pd.concat(srlist)
+
+    def _blk2series(self, ext, blk, head, tail):
+        if ext != "gz":
+            raise TmpoError("Compression type not supported")
+        jblk = zlib.decompress(blk, zlib.MAX_WBITS | 16)  # gzip decoding
+        m = re.match(RE_JSON_BLK, jblk)
+        pdjblk = '{"index":%s,"data":%s}' % (m.group("t"), m.group("v"))
+        pdsblk = pd.read_json(
+            pdjblk,
+            typ="series",
+            dtype="float",
+            orient="split",
+            numpy=True,
+            date_unit="s")
+        h = json.loads(m.group("h"))
+        self._npdelta(pdsblk.index, h["head"][0])
+        self._npdelta(pdsblk, h["head"][1])
+        return pdsblk
+
+    def _npdelta(self, a, delta):
+        """Numpy: Modifying Array Values
+            http://docs.scipy.org/doc/numpy/reference/arrays.nditer.html"""
+        for x in np.nditer(a, op_flags=["readwrite"]):
+            delta += x
+            x[...] = delta
+        return a
+
     def _rqsync(self, sid, rid, lvl, bid):
         self.dbcur.execute(SQL_SENSOR_TOKEN, (sid,))
         token, = self.dbcur.fetchone()
@@ -210,6 +255,10 @@ class Session():
     def _lastchild(self, lvl, bid):
         delta = math.trunc(2 ** (lvl - 4))
         return bid + 15 * delta
+
+    def _blocktail(self, lvl, bid):
+        delta = math.trunc(2 ** lvl)
+        return bid + delta
 
     def _dprintf(self, fmt, *args):
         if self.debug:
