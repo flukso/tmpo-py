@@ -184,7 +184,7 @@ class Session():
         for _sid, rid, lvl, bid, ext, ctd, blk in tlist:
             if head < self._blocktail(lvl, bid) and tail >= bid:
                 srlist.append(self._blk2series(ext, blk, head, tail))
-        return pd.concat(srlist)
+        return pd.concat(srlist).truncate(before=head, after=tail)
 
     def _blk2series(self, ext, blk, head, tail):
         if ext != "gz":
