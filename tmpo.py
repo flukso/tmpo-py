@@ -251,6 +251,7 @@ class Session():
         lastchild = self._lastchild(lvl, bid)
         self.dbcur.execute(SQL_TMPO_CLEAN, (sid, rid, lvl - 4, lastchild))
         self.dbcon.commit()
+        self._clean(sid, rid, lvl - 4, lastchild)
 
     def _lastchild(self, lvl, bid):
         delta = math.trunc(2 ** (lvl - 4))
