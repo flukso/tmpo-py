@@ -126,9 +126,9 @@ class Session():
         self.debug = False
         if path is None:
             path = os.environ["HOME"]
-        self.home = path + "/.tmpo"
-        self.db = self.home + "/tmpo.sqlite3"
-        self.crt = self.home + "/flukso.crt"
+        self.home = path + os.sep + ".tmpo"
+        self.db = self.home + os.sep + "tmpo.sqlite3"
+        self.crt = self.home + os.sep + "flukso.crt"
         self.host = "api.flukso.net"
         try:
             os.mkdir(self.home)
