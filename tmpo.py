@@ -197,9 +197,18 @@ class Session():
             and tail >= bid):
                 srlist.append(self._blk2series(ext, blk, head, tail))
         if len(srlist) > 0:
-            return pd.concat(srlist).truncate(before=head, after=tail)
+            ts = pd.concat(srlist).truncate(before=head, after=tail)
+            ts.name = sid
+            return ts
         else:
-            return pd.Series([])
+            return pd.Series([], name=sid)
+
+    def dataframe(self, sids, head=0, tail=sys.maxint, datetime=True):
+        series = [self.series(sid, head=head, tail=tail) for sid in sids]
+        df = pd.concat(series, axis=1)
+        if datetime is True:
+            df.index = pd.to_datetime(df.index, unit="s")
+        return df
 
     def _blk2series(self, ext, blk, head, tail):
         if ext != "gz":
