@@ -117,9 +117,11 @@ class TmpoError(Exception):
 
 
 class Session():
-    def __init__(self):
+    def __init__(self, path = None):
         self.debug = False
-        self.home = os.environ["HOME"] + "/.tmpo"
+        if path is None: 
+            path = os.environ["HOME"]
+        self.home = path + "/.tmpo"
         self.db = self.home + "/tmpo.sqlite3"
         self.crt = self.home + "/flukso.crt"
         self.host = "api.flukso.net"
