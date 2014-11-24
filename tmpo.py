@@ -207,7 +207,7 @@ class Session():
         series = [self.series(sid, head=head, tail=tail) for sid in sids]
         df = pd.concat(series, axis=1)
         if datetime is True:
-            df.index = pd.to_datetime(df.index, unit="s")
+            df.index = pd.to_datetime(df.index, unit="s", utc=True)
         return df
 
     def _blk2series(self, ext, blk, head, tail):
