@@ -186,6 +186,8 @@ class Session():
         return slist
 
     def series(self, sid, recycle_id=None, head=0, tail=sys.maxint):
+        head = self._2epochs(head)
+        tail = self._2epochs(tail)
         if recycle_id is None:
             self.dbcur.execute(SQL_TMPO_RID_MAX, (sid,))
             recycle_id = self.dbcur.fetchone()[0]
@@ -204,11 +206,19 @@ class Session():
             return pd.Series([], name=sid)
 
     def dataframe(self, sids, head=0, tail=sys.maxint, datetime=True):
+        head = self._2epochs(head)
+        tail = self._2epochs(tail)
         series = [self.series(sid, head=head, tail=tail) for sid in sids]
         df = pd.concat(series, axis=1)
         if datetime is True:
             df.index = pd.to_datetime(df.index, unit="s", utc=True)
         return df
+
+    def _2epochs(self, time):
+        if isinstance(time, pd.tslib.Timestamp):
+            return int(math.floor(time.value / 1e9))
+        else:
+            return time
 
     def _blk2series(self, ext, blk, head, tail):
         if ext != "gz":
