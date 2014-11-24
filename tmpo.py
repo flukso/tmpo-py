@@ -87,6 +87,11 @@ SQL_TMPO_LAST = """
     ORDER BY created DESC, lvl DESC
     LIMIT 1"""
 
+SQL_TMPO_RID_MAX = """
+    SELECT MAX(rid)
+    FROM tmpo
+    WHERE sid = ?"""
+
 API_TMPO_SYNC = "https://%s/sensor/%s/tmpo/sync"
 API_TMPO_BLOCK = "https://%s/sensor/%s/tmpo/%d/%d/%d"
 
@@ -117,9 +122,9 @@ class TmpoError(Exception):
 
 
 class Session():
-    def __init__(self, path = None):
+    def __init__(self, path=None):
         self.debug = False
-        if path is None: 
+        if path is None:
             path = os.environ["HOME"]
         self.home = path + "/.tmpo"
         self.db = self.home + "/tmpo.sqlite3"
@@ -180,11 +185,16 @@ class Session():
             slist.append(tlist)
         return slist
 
-    def series(self, sid, head=0, tail=sys.maxint):
+    def series(self, sid, recycle_id=None, head=0, tail=sys.maxint):
+        if recycle_id is None:
+            self.dbcur.execute(SQL_TMPO_RID_MAX, (sid,))
+            recycle_id = self.dbcur.fetchone()[0]
         tlist = self.list(sid)[0]
         srlist = []
         for _sid, rid, lvl, bid, ext, ctd, blk in tlist:
-            if head < self._blocktail(lvl, bid) and tail >= bid:
+            if (recycle_id == rid
+            and head < self._blocktail(lvl, bid)
+            and tail >= bid):
                 srlist.append(self._blk2series(ext, blk, head, tail))
         if len(srlist) > 0:
             return pd.concat(srlist).truncate(before=head, after=tail)
