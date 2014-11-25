@@ -1,5 +1,5 @@
 __title__ = "tmpo"
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __build__ = 0x000100
 __author__ = "Bart Van Der Meerssche"
 __license__ = "MIT"
@@ -185,7 +185,8 @@ class Session():
             slist.append(tlist)
         return slist
 
-    def series(self, sid, recycle_id=None, head=0, tail=sys.maxint):
+    def series(self, sid, recycle_id=None, head=0, tail=sys.maxint,
+               datetime=True):
         head = self._2epochs(head)
         tail = self._2epochs(tail)
         if recycle_id is None:
@@ -201,6 +202,8 @@ class Session():
         if len(srlist) > 0:
             ts = pd.concat(srlist).truncate(before=head, after=tail)
             ts.name = sid
+            if datetime is True:
+                ts.index = pd.to_datetime(ts.index, unit="s", utc=True)
             return ts
         else:
             return pd.Series([], name=sid)
@@ -208,7 +211,8 @@ class Session():
     def dataframe(self, sids, head=0, tail=sys.maxint, datetime=True):
         head = self._2epochs(head)
         tail = self._2epochs(tail)
-        series = [self.series(sid, head=head, tail=tail) for sid in sids]
+        series = [self.series(sid, head=head, tail=tail, datetime=False)
+                  for sid in sids]
         df = pd.concat(series, axis=1)
         if datetime is True:
             df.index = pd.to_datetime(df.index, unit="s", utc=True)
