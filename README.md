@@ -1,10 +1,10 @@
 ## 1. Overview ##
 
-Tmpo-py is a Python 2.7 client library for tmpo. It synchronizes tmpo blocks with the Flukso REST API, caching them locally in a SQLite DB after download. A Pandas Time Series object can be built from these tmpo blocks with proper head/tail truncating.
+Tmpo-py is a Python 2.7/3.x client library for tmpo. It synchronizes tmpo blocks with the Flukso REST API, caching them locally in a SQLite DB after download. A Pandas Time Series object can be built from these tmpo blocks with proper head/tail truncating.
 
 ## 2. Commands ##
 
-Creating a tmpo session object, which sets up a connection to the $HOME/.tmpo/tmpo.sqlite3 database. If the latter does not exist, it is initialized with the proper tables.
+Create a tmpo session object, which sets up a connection to the $HOME/.tmpo/tmpo.sqlite3 database. If the latter does not exist, it is initialized with the proper tables.
 
     >>> import tmpo
     >>> s = tmpo.Session()

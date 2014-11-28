@@ -101,10 +101,10 @@ HTTP_ACCEPT = {
 
 RE_JSON_BLK = r'^\{"h":(?P<h>\{.+?\}),"t":(?P<t>\[.+?\]),"v":(?P<v>\[.+?\])\}$'
 DBG_TMPO_SINK = "time:%.3f sid:%s rid:%d lvl:%2d bid:%d size[B]:%d"
+EPOCHS_MAX = 2147483647
 
 
 import os
-import sys
 import io
 import math
 import time
@@ -185,7 +185,7 @@ class Session():
             slist.append(tlist)
         return slist
 
-    def series(self, sid, recycle_id=None, head=0, tail=sys.maxint,
+    def series(self, sid, recycle_id=None, head=0, tail=EPOCHS_MAX,
                datetime=True):
         head = self._2epochs(head)
         tail = self._2epochs(tail)
@@ -208,7 +208,7 @@ class Session():
         else:
             return pd.Series([], name=sid)
 
-    def dataframe(self, sids, head=0, tail=sys.maxint, datetime=True):
+    def dataframe(self, sids, head=0, tail=EPOCHS_MAX, datetime=True):
         head = self._2epochs(head)
         tail = self._2epochs(tail)
         series = [self.series(sid, head=head, tail=tail, datetime=False)
