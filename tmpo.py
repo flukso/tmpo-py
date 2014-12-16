@@ -124,7 +124,7 @@ class TmpoError(Exception):
 
 
 class Session():
-    def __init__(self, path=None):
+    def __init__(self, path=None, workers=16):
         self.debug = False
         if path is None:
             path = os.environ["HOME"]
@@ -145,7 +145,8 @@ class Session():
         self.dbcur.execute(SQL_TMPO_TABLE)
         self.dbcon.commit()
         self.rqs = requests_futures.sessions.FuturesSession(
-            executor=concurrent.futures.ThreadPoolExecutor(max_workers=10))
+            executor=concurrent.futures.ThreadPoolExecutor(
+                max_workers=workers))
         self.rqs.headers.update({"X-Version": "1.0"})
 
     def add(self, sid, token):
