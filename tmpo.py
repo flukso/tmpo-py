@@ -100,6 +100,9 @@ HTTP_ACCEPT = {
     "gz": "application/gzip"}
 
 RE_JSON_BLK = r'^\{"h":(?P<h>\{.+?\}),"t":(?P<t>\[.+?\]),"v":(?P<v>\[.+?\])\}$'
+DBG_TMPO_SINK_GET = "Request block | time:%.3f sid:%s rid:%d lvl:%2d bid:%d"
+DBG_TMPO_SINK_STORE = \
+        "Store block | time:%.3f sid:%s rid:%d lvl:%2d bid:%d size[B]:%d"
 DBG_TMPO_SINK = "time:%.3f sid:%s rid:%d lvl:%2d bid:%d size[B]:%d"
 EPOCHS_MAX = 2147483647
 
@@ -109,7 +112,8 @@ import io
 import math
 import time
 import sqlite3
-import requests
+import requests_futures.sessions
+import concurrent.futures
 import zlib
 import re
 import json
@@ -142,7 +146,8 @@ class Session():
         self.dbcur.execute(SQL_SENSOR_TABLE)
         self.dbcur.execute(SQL_TMPO_TABLE)
         self.dbcon.commit()
-        self.rqs = requests.Session()
+        self.rqs = requests_futures.sessions.FuturesSession(
+                executor=concurrent.futures.ThreadPoolExecutor(max_workers=10))
         self.rqs.headers.update({"X-Version": "1.0"})
 
     def add(self, sid, token):
@@ -260,28 +265,36 @@ class Session():
             "rid": rid,
             "lvl": lvl,
             "bid": bid}
-        r = self.rqs.get(
+        f = self.rqs.get(
             API_TMPO_SYNC % (self.host, sid),
             headers=headers,
             params=params,
             verify=self.crt)
+        r = f.result()
+        fs = []
         for t in r.json():
-            self._rqblock(sid, token, t["rid"], t["lvl"], t["bid"], t["ext"])
+            fs.append((t,self._rqblock(sid, token, t["rid"], t["lvl"], t["bid"], t["ext"])))
+        for (t,f) in fs:
+            self._store_block(f.result(), sid, t["rid"], t["lvl"], t["bid"], t["ext"])
 
     def _rqblock(self, sid, token, rid, lvl, bid, ext):
         headers = {
             "Accept": HTTP_ACCEPT["gz"],
             "X-Token": token}
-        r = self.rqs.get(
+        f = self.rqs.get(
             API_TMPO_BLOCK % (self.host, sid, rid, lvl, bid),
             headers=headers,
             verify=self.crt)
+        self._dprintf(DBG_TMPO_SINK_GET, time.time(), sid, rid, lvl, bid)
+        return f
+
+    def _store_block(self, r, sid, rid, lvl, bid, ext):
         blk = sqlite3.Binary(r.content)
         now = time.time()
         self.dbcur.execute(SQL_TMPO_INS, (sid, rid, lvl, bid, ext, now, blk))
         self.dbcon.commit()
         self._clean(sid, rid, lvl, bid)
-        self._dprintf(DBG_TMPO_SINK, now, sid, rid, lvl, bid, len(blk))
+        self._dprintf(DBG_TMPO_SINK_STORE, now, sid, rid, lvl, bid, len(blk))
 
     def _clean(self, sid, rid, lvl, bid):
         if lvl == 8:
