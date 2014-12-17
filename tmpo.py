@@ -225,8 +225,11 @@ class Session():
     def _2epochs(self, time):
         if isinstance(time, pd.tslib.Timestamp):
             return int(math.floor(time.value / 1e9))
-        else:
+        elif isinstance(time, int):
             return time
+        else:
+            raise TmpoError("Time format not supported. " +
+                            "Use epochs or a Pandas timestamp.")
 
     def _blk2series(self, ext, blk, head, tail):
         if ext != "gz":
