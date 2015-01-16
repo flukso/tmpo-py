@@ -230,8 +230,11 @@ class Session():
             headers=headers,
             params=params,
             verify=self.crt)
-        for t in r.json():
-            self._rqblock(sid, token, t["rid"], t["lvl"], t["bid"], t["ext"])
+        if r.status_code == 200:
+            for t in r.json():
+                self._rqblock(sid, token, t["rid"], t["lvl"], t["bid"], t["ext"])
+        else:
+            print('http status_code %s' % r.status_code)
 
     def _rqblock(self, sid, token, rid, lvl, bid, ext):
         headers = {
