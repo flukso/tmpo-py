@@ -185,7 +185,7 @@ class Session():
             for tmpo in self.dbcur.execute(SQL_TMPO_ALL, (sid,)):
                 tlist.append(tmpo)
                 sid, rid, lvl, bid, ext, ctd, blk = tmpo
-                self._dprintf(DBG_TMPO_SINK, ctd, sid, rid, lvl, bid, len(blk))
+                self._dprintf(DBG_TMPO_WRITE, ctd, sid, rid, lvl, bid, len(blk))
             slist.append(tlist)
         return slist
 
