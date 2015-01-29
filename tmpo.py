@@ -138,7 +138,7 @@ class Session():
             pass
         else:
             with io.open(self.crt, "wb") as f:
-                f.write(FLUKSO_CRT)
+                f.write(FLUKSO_CRT.encode("ascii"))
         self.dbcon = sqlite3.connect(self.db)
         self.dbcur = self.dbcon.cursor()
         self.dbcur.execute(SQL_SENSOR_TABLE)
@@ -235,7 +235,7 @@ class Session():
         if ext != "gz":
             raise TmpoError("Compression type not supported")
         jblk = zlib.decompress(blk, zlib.MAX_WBITS | 16)  # gzip decoding
-        m = re.match(RE_JSON_BLK, jblk)
+        m = re.match(RE_JSON_BLK, jblk.decode("utf-8"))
         pdjblk = '{"index":%s,"data":%s}' % (m.group("t"), m.group("v"))
         pdsblk = pd.read_json(
             pdjblk,
