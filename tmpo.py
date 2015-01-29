@@ -124,7 +124,10 @@ class Session():
         self.debug = False
         if path is None:
             path = os.environ["HOME"]
-        self.home = path + os.sep + ".tmpo"
+        if _platform == "linux" or _platform == "linux2":
+            self.home = path + os.sep + ".tmpo"
+        elif _platform == "win32":
+            self.home = path + os.sep + "tmpo"
         self.db = self.home + os.sep + "tmpo.sqlite3"
         self.crt = self.home + os.sep + "flukso.crt"
         self.host = "api.flukso.net"
