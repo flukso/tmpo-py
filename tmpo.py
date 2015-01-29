@@ -119,10 +119,6 @@ import numpy as np
 import pandas as pd
 
 
-class TmpoError(Exception):
-    pass
-
-
 class Session():
     def __init__(self, path=None, workers=16):
         self.debug = False
@@ -233,7 +229,7 @@ class Session():
 
     def _blk2series(self, ext, blk, head, tail):
         if ext != "gz":
-            raise TmpoError("Compression type not supported")
+            raise NotImplementedError("Compression type not supported in tmpo")
         jblk = zlib.decompress(blk, zlib.MAX_WBITS | 16)  # gzip decoding
         m = re.match(RE_JSON_BLK, jblk.decode("utf-8"))
         pdjblk = '{"index":%s,"data":%s}' % (m.group("t"), m.group("v"))
