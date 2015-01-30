@@ -124,7 +124,7 @@ class Session():
         self.debug = False
         if path is None:
             path = os.environ["HOME"]
-        if _platform == "linux" or _platform == "linux2":
+        if _platform == "linux" or _platform == "linux2" or _platform == "darwin":
             self.home = path + os.sep + ".tmpo"
         elif _platform == "win32":
             self.home = path + os.sep + "tmpo"
