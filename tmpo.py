@@ -106,6 +106,7 @@ EPOCHS_MAX = 2147483647
 
 
 import os
+import sys
 import io
 import math
 import time
@@ -124,9 +125,12 @@ class Session():
         self.debug = False
         if path is None:
             path = os.environ["HOME"]
-        self.home = path + os.sep + ".tmpo"
-        self.db = self.home + os.sep + "tmpo.sqlite3"
-        self.crt = self.home + os.sep + "flukso.crt"
+        if sys.platform == "win32":
+            self.home = os.path.join(path, "tmpo")
+        else:
+            self.home = os.path.join(path, ".tmpo")
+        self.db = os.path.join(self.home, "tmpo.sqlite3")
+        self.crt = os.path.join(self.home, "flukso.crt")
         self.host = "api.flukso.net"
         try:
             os.mkdir(self.home)
