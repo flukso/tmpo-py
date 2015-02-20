@@ -228,8 +228,8 @@ class Session():
         elif isinstance(time, int):
             return time
         else:
-            raise TmpoError("Time format not supported. " +
-                            "Use epochs or a Pandas timestamp.")
+            raise NotImplementedError("Time format not supported. " +
+                                      "Use epochs or a Pandas timestamp.")
 
     def _blk2series(self, ext, blk, head, tail):
         if ext != "gz":
