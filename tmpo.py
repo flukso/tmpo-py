@@ -124,7 +124,7 @@ class Session():
     def __init__(self, path=None, workers=16):
         self.debug = False
         if path is None:
-            path = os.environ["HOME"]
+            path = os.path.expanduser("~") # $HOME
         if sys.platform == "win32":
             self.home = os.path.join(path, "tmpo")
         else:
