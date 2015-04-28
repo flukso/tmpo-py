@@ -204,7 +204,7 @@ class Session():
             and tail >= bid):
                 srlist.append(self._blk2series(ext, blk, head, tail))
         if len(srlist) > 0:
-            ts = pd.concat(srlist).truncate(before=head, after=tail)
+            ts = pd.concat(srlist)
             ts.name = sid
             if datetime is True:
                 ts.index = pd.to_datetime(ts.index, unit="s", utc=True)
@@ -247,7 +247,7 @@ class Session():
         h = json.loads(m.group("h"))
         self._npdelta(pdsblk.index, h["head"][0])
         self._npdelta(pdsblk, h["head"][1])
-        return pdsblk
+        return pdsblk.truncate(before=head, after=tail)
 
     def _npdelta(self, a, delta):
         """Numpy: Modifying Array Values
