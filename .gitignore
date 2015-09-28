@@ -55,3 +55,9 @@ target/
 
 # Vim
 *.swp
+
+# ipython notebook checkpoints
+*.ipynb_checkpoints/
+
+# tmpo cache
+.tmpo
