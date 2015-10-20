@@ -265,7 +265,8 @@ class Session():
         token, = self.dbcur.fetchone()
         headers = {
             "Accept": HTTP_ACCEPT["json"],
-            "X-Token": token}
+            "X-Token": token,
+            "Connection": "close"}
         params = {
             "rid": rid,
             "lvl": lvl,
@@ -287,7 +288,8 @@ class Session():
     def _req_block(self, sid, token, rid, lvl, bid, ext):
         headers = {
             "Accept": HTTP_ACCEPT["gz"],
-            "X-Token": token}
+            "X-Token": token,
+            "Connection": "close"}
         f = self.rqs.get(
             API_TMPO_BLOCK % (self.host, sid, rid, lvl, bid),
             headers=headers,
