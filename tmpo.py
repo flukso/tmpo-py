@@ -247,7 +247,10 @@ class Session():
         h = json.loads(m.group("h"))
         self._npdelta(pdsblk.index, h["head"][0])
         self._npdelta(pdsblk, h["head"][1])
-        return pdsblk.truncate(before=head, after=tail)
+        # only truncate if needed (avoids pandas bug and more efficient)
+        # don't use pandas.truncate with integer indices!
+        pdsblk_truncated = pdsblk.loc[max(head, pdsblk.index[0]):min(tail, pdsblk.index[-1])] 
+        return pdsblk_truncated
 
     def _npdelta(self, a, delta):
         """Numpy: Modifying Array Values
