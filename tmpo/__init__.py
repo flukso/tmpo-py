@@ -121,6 +121,8 @@ import pandas as pd
 
 
 def dbcon(func):
+    """Set up connection before executing function, commit and close connection
+    afterwards. Unless a connection already has been created."""
     def wrapper(*args, **kwargs):
         self = args[0]
         if self.dbcon is None:
@@ -136,6 +138,8 @@ def dbcon(func):
             self.dbcon.close()
             self.dbcon = None
             self.dbcur = None
+        else:
+            result = func(*args, **kwargs)
         return result
     return wrapper
 
