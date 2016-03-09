@@ -1,5 +1,5 @@
 __title__ = "tmpo"
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __build__ = 0x000100
 __author__ = "Bart Van Der Meerssche"
 __license__ = "MIT"
@@ -120,6 +120,30 @@ import numpy as np
 import pandas as pd
 
 
+def dbcon(func):
+    """Set up connection before executing function, commit and close connection
+    afterwards. Unless a connection already has been created."""
+    def wrapper(*args, **kwargs):
+        self = args[0]
+        if self.dbcon is None:
+            # set up connection
+            self.dbcon = sqlite3.connect(self.db)
+            self.dbcur = self.dbcon.cursor()
+            self.dbcur.execute(SQL_SENSOR_TABLE)
+            self.dbcur.execute(SQL_TMPO_TABLE)
+            # execute function
+            result = func(*args, **kwargs)
+            # commit everything and close connection
+            self.dbcon.commit()
+            self.dbcon.close()
+            self.dbcon = None
+            self.dbcur = None
+        else:
+            result = func(*args, **kwargs)
+        return result
+    return wrapper
+
+
 class Session():
     def __init__(self, path=None, workers=16):
         self.debug = False
@@ -139,27 +163,25 @@ class Session():
         else:
             with io.open(self.crt, "wb") as f:
                 f.write(FLUKSO_CRT.encode("ascii"))
-        self.dbcon = sqlite3.connect(self.db)
-        self.dbcur = self.dbcon.cursor()
-        self.dbcur.execute(SQL_SENSOR_TABLE)
-        self.dbcur.execute(SQL_TMPO_TABLE)
-        self.dbcon.commit()
         self.rqs = requests_futures.sessions.FuturesSession(
             executor=concurrent.futures.ThreadPoolExecutor(
                 max_workers=workers))
         self.rqs.headers.update({"X-Version": "1.0"})
+        self.dbcon = None
+        self.dbcur = None
 
+    @dbcon
     def add(self, sid, token):
         try:
             self.dbcur.execute(SQL_SENSOR_INS, (sid, token))
-            self.dbcon.commit()
         except sqlite3.IntegrityError:  # sensor entry exists
             pass
 
+    @dbcon
     def remove(self, sid):
         self.dbcur.execute(SQL_SENSOR_DEL, (sid,))
-        self.dbcon.commit()
 
+    @dbcon
     def sync(self, *sids):
         if sids == ():
             sids = [sid for (sid,) in self.dbcur.execute(SQL_SENSOR_ALL)]
@@ -176,6 +198,7 @@ class Session():
                 rid, lvl, bid = 0, 0, 0
             self._req_sync(sid, rid, lvl, bid)
 
+    @dbcon
     def list(self, *sids):
         if sids == ():
             sids = [sid for (sid,) in self.dbcur.execute(SQL_SENSOR_ALL)]
@@ -189,6 +212,7 @@ class Session():
             slist.append(tlist)
         return slist
 
+    @dbcon
     def series(self, sid, recycle_id=None, head=0, tail=EPOCHS_MAX,
                datetime=True):
         head = self._2epochs(head)
@@ -212,6 +236,7 @@ class Session():
         else:
             return pd.Series([], name=sid)
 
+    @dbcon
     def dataframe(self, sids, head=0, tail=EPOCHS_MAX, datetime=True):
         head = self._2epochs(head)
         tail = self._2epochs(tail)
@@ -299,7 +324,6 @@ class Session():
         blk = sqlite3.Binary(r.content)
         now = time.time()
         self.dbcur.execute(SQL_TMPO_INS, (sid, rid, lvl, bid, ext, now, blk))
-        self.dbcon.commit()
         self._clean(sid, rid, lvl, bid)
         self._dprintf(DBG_TMPO_WRITE, now, sid, rid, lvl, bid, len(blk))
 
@@ -308,7 +332,6 @@ class Session():
             return
         lastchild = self._lastchild(lvl, bid)
         self.dbcur.execute(SQL_TMPO_CLEAN, (sid, rid, lvl - 4, lastchild))
-        self.dbcon.commit()
         self._clean(sid, rid, lvl - 4, lastchild)
 
     def _lastchild(self, lvl, bid):
