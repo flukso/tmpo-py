@@ -1,5 +1,5 @@
 __title__ = "tmpo"
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 __build__ = 0x000100
 __author__ = "Bart Van Der Meerssche"
 __license__ = "MIT"
@@ -272,9 +272,8 @@ class Session():
         h = json.loads(m.group("h"))
         self._npdelta(pdsblk.index, h["head"][0])
         self._npdelta(pdsblk, h["head"][1])
-        # only truncate if needed (avoids pandas bug and more efficient)
-        # don't use pandas.truncate with integer indices!
-        pdsblk_truncated = pdsblk.loc[max(head, pdsblk.index[0]):min(tail, pdsblk.index[-1])] 
+        # Use the built-in ix method to truncate
+        pdsblk_truncated = pdsblk.ix[head:tail] 
         return pdsblk_truncated
 
     def _npdelta(self, a, delta):
