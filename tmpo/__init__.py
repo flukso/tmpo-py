@@ -118,11 +118,13 @@ import re
 import json
 import numpy as np
 import pandas as pd
+from functools import wraps
 
 
 def dbcon(func):
     """Set up connection before executing function, commit and close connection
     afterwards. Unless a connection already has been created."""
+    @wraps(func)
     def wrapper(*args, **kwargs):
         self = args[0]
         if self.dbcon is None:
@@ -146,6 +148,14 @@ def dbcon(func):
 
 class Session():
     def __init__(self, path=None, workers=16):
+        """
+        Parameters
+        ----------
+        path : str, optional
+            location for the database
+        workers : int
+            default 16
+        """
         self.debug = False
         if path is None:
             path = os.path.expanduser("~") # $HOME
@@ -172,6 +182,15 @@ class Session():
 
     @dbcon
     def add(self, sid, token):
+        """
+        Add new sensor to the database
+
+        Parameters
+        ----------
+        sid : str
+            SensorId
+        token : str
+        """
         try:
             self.dbcur.execute(SQL_SENSOR_INS, (sid, token))
         except sqlite3.IntegrityError:  # sensor entry exists
@@ -179,10 +198,27 @@ class Session():
 
     @dbcon
     def remove(self, sid):
+        """
+        Remove sensor from the database
+
+        Parameters
+        ----------
+        sid : str
+            SensorID
+        """
         self.dbcur.execute(SQL_SENSOR_DEL, (sid,))
 
     @dbcon
     def sync(self, *sids):
+        """
+        Synchronise data
+
+        Parameters
+        ----------
+        sids : list of str
+            SensorIDs to sync
+            Optional, leave empty to sync everything
+        """
         if sids == ():
             sids = [sid for (sid,) in self.dbcur.execute(SQL_SENSOR_ALL)]
         for sid in sids:
@@ -200,6 +236,19 @@ class Session():
 
     @dbcon
     def list(self, *sids):
+        """
+        List all tmpo-blocks in the database
+
+        Parameters
+        ----------
+        sids : list of str
+            SensorID's for which to list blocks
+            Optional, leave empty to get them all
+
+        Returns
+        -------
+        list[list[tuple]]
+        """
         if sids == ():
             sids = [sid for (sid,) in self.dbcur.execute(SQL_SENSOR_ALL)]
         slist = []
@@ -215,6 +264,27 @@ class Session():
     @dbcon
     def series(self, sid, recycle_id=None, head=0, tail=EPOCHS_MAX,
                datetime=True):
+        """
+        Create data Series
+
+        Parameters
+        ----------
+        sid : str
+        recycle_id : optional
+        head : int | pandas.tslib.Timestamp
+            Start of the interval
+            default earliest available
+        tail : int | pandas.tslib.Timestamp
+            End of the interval
+            default max epoch
+        datetime : bool
+            convert index to datetime
+            default True
+
+        Returns
+        -------
+        pandas.Series
+        """
         head = self._2epochs(head)
         tail = self._2epochs(tail)
         if recycle_id is None:
@@ -238,6 +308,26 @@ class Session():
 
     @dbcon
     def dataframe(self, sids, head=0, tail=EPOCHS_MAX, datetime=True):
+        """
+        Create data frame
+
+        Parameters
+        ----------
+        sids : list[str]
+        head : int | pandas.tslib.Timestamp
+            Start of the interval
+            default earliest available
+        tail : int | pandas.tslib.Timestamp
+            End of the interval
+            default max epoch
+        datetime : bool
+            convert index to datetime
+            default True
+
+        Returns
+        -------
+        pandas.DataFrame
+        """
         head = self._2epochs(head)
         tail = self._2epochs(tail)
         series = [self.series(sid, head=head, tail=tail, datetime=False)
