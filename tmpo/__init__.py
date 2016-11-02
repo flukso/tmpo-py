@@ -272,8 +272,11 @@ class Session():
         -------
         pd.Timestamp | int
         """
-        first_block = self.dbcur.execute(SQL_TMPO_FIRST, (sid,))
-        timestamp = first_block.fetchone()[2]
+        first_block = self.dbcur.execute(SQL_TMPO_FIRST, (sid,)).fetchone()
+        if first_block is None:
+            return None
+
+        timestamp = first_block[2]
         if epoch:
             return timestamp
         else:
