@@ -131,13 +131,24 @@ def dbcon(func):
             self.dbcur = self.dbcon.cursor()
             self.dbcur.execute(SQL_SENSOR_TABLE)
             self.dbcur.execute(SQL_TMPO_TABLE)
+
             # execute function
-            result = func(*args, **kwargs)
-            # commit everything and close connection
-            self.dbcon.commit()
-            self.dbcon.close()
-            self.dbcon = None
-            self.dbcur = None
+            try:
+                result = func(*args, **kwargs)
+            except Exception as e:
+                # on exception, first close connection and then raise
+                self.dbcon.rollback()
+                self.dbcon.commit()
+                self.dbcon.close()
+                self.dbcon = None
+                self.dbcur = None
+                raise e
+            else:
+                # commit everything and close connection
+                self.dbcon.commit()
+                self.dbcon.close()
+                self.dbcon = None
+                self.dbcur = None
         else:
             result = func(*args, **kwargs)
         return result
