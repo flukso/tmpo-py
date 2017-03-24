@@ -311,6 +311,7 @@ class Session():
             params=params,
             verify=self.crt)
         r = f.result()
+        r.raise_for_status()
         fs = []
         for t in r.json():
             fs.append((t, self._req_block(
