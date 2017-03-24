@@ -1,5 +1,5 @@
 __title__ = "tmpo"
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 __build__ = 0x000100
 __author__ = "Bart Van Der Meerssche"
 __license__ = "MIT"
@@ -85,6 +85,13 @@ SQL_TMPO_LAST = """
     FROM tmpo
     WHERE sid = ?
     ORDER BY created DESC, lvl DESC
+    LIMIT 1"""
+
+SQL_TMPO_FIRST = """
+    SELECT rid, lvl, bid
+    FROM tmpo
+    WHERE sid = ?
+    ORDER BY created ASC, lvl ASC
     LIMIT 1"""
 
 SQL_TMPO_RID_MAX = """
@@ -347,6 +354,60 @@ class Session():
         if datetime is True:
             df.index = pd.to_datetime(df.index, unit="s", utc=True)
         return df
+
+    @dbcon
+    def first_timestamp(self, sid, epoch=False):
+        """
+        Get the first available timestamp for a sensor
+
+        Parameters
+        ----------
+        sid : str
+            SensorID
+        epoch : bool
+            default False
+            If True return as epoch
+            If False return as pd.Timestamp
+
+        Returns
+        -------
+        pd.Timestamp | int
+        """
+        first_block = self.dbcur.execute(SQL_TMPO_FIRST, (sid,)).fetchone()
+        if first_block is None:
+            return None
+
+        timestamp = first_block[2]
+        if epoch:
+            return timestamp
+        else:
+            return pd.Timestamp.fromtimestamp(timestamp).tz_localize('UTC')
+
+    @dbcon
+    def last_timestamp(self, sid, epoch=False):
+        """
+        Get the theoretical last timestamp for a sensor
+        It is the mathematical end of the last block, the actual last sensor stamp may be earlier
+
+        Parameters
+        ----------
+        sid : str
+            SensorID
+        epoch : bool
+            default False
+            If True return as epoch
+            If False return as pd.Timestamp
+
+        Returns
+        -------
+        pd.Timestamp | int
+        """
+        rid, lvl, bid = self.dbcur.execute(SQL_TMPO_LAST, (sid,)).fetchone()
+        end_of_block = self._blocktail(lvl, bid)
+        if epoch:
+            return end_of_block
+        else:
+            return pd.Timestamp.fromtimestamp(end_of_block).tz_localize('UTC')
 
     def _2epochs(self, time):
         if isinstance(time, pd.tslib.Timestamp):
