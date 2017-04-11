@@ -1,5 +1,5 @@
 __title__ = "tmpo"
-__version__ = "0.2.0"
+__version__ = "0.2.3"
 __build__ = 0x000100
 __author__ = "Bart Van Der Meerssche"
 __license__ = "MIT"
@@ -87,6 +87,13 @@ SQL_TMPO_LAST = """
     ORDER BY created DESC, lvl DESC
     LIMIT 1"""
 
+SQL_TMPO_FIRST = """
+    SELECT rid, lvl, bid
+    FROM tmpo
+    WHERE sid = ?
+    ORDER BY created ASC, lvl ASC
+    LIMIT 1"""
+
 SQL_TMPO_RID_MAX = """
     SELECT MAX(rid)
     FROM tmpo
@@ -118,10 +125,55 @@ import re
 import json
 import numpy as np
 import pandas as pd
+from functools import wraps
+
+
+def dbcon(func):
+    """Set up connection before executing function, commit and close connection
+    afterwards. Unless a connection already has been created."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        self = args[0]
+        if self.dbcon is None:
+            # set up connection
+            self.dbcon = sqlite3.connect(self.db)
+            self.dbcur = self.dbcon.cursor()
+            self.dbcur.execute(SQL_SENSOR_TABLE)
+            self.dbcur.execute(SQL_TMPO_TABLE)
+
+            # execute function
+            try:
+                result = func(*args, **kwargs)
+            except Exception as e:
+                # on exception, first close connection and then raise
+                self.dbcon.rollback()
+                self.dbcon.commit()
+                self.dbcon.close()
+                self.dbcon = None
+                self.dbcur = None
+                raise e
+            else:
+                # commit everything and close connection
+                self.dbcon.commit()
+                self.dbcon.close()
+                self.dbcon = None
+                self.dbcur = None
+        else:
+            result = func(*args, **kwargs)
+        return result
+    return wrapper
 
 
 class Session():
     def __init__(self, path=None, workers=16):
+        """
+        Parameters
+        ----------
+        path : str, optional
+            location for the database
+        workers : int
+            default 16
+        """
         self.debug = False
         if path is None:
             path = os.path.expanduser("~") # $HOME
@@ -139,28 +191,52 @@ class Session():
         else:
             with io.open(self.crt, "wb") as f:
                 f.write(FLUKSO_CRT.encode("ascii"))
-        self.dbcon = sqlite3.connect(self.db)
-        self.dbcur = self.dbcon.cursor()
-        self.dbcur.execute(SQL_SENSOR_TABLE)
-        self.dbcur.execute(SQL_TMPO_TABLE)
-        self.dbcon.commit()
         self.rqs = requests_futures.sessions.FuturesSession(
             executor=concurrent.futures.ThreadPoolExecutor(
                 max_workers=workers))
         self.rqs.headers.update({"X-Version": "1.0"})
+        self.dbcon = None
+        self.dbcur = None
 
+    @dbcon
     def add(self, sid, token):
+        """
+        Add new sensor to the database
+
+        Parameters
+        ----------
+        sid : str
+            SensorId
+        token : str
+        """
         try:
             self.dbcur.execute(SQL_SENSOR_INS, (sid, token))
-            self.dbcon.commit()
         except sqlite3.IntegrityError:  # sensor entry exists
             pass
 
+    @dbcon
     def remove(self, sid):
-        self.dbcur.execute(SQL_SENSOR_DEL, (sid,))
-        self.dbcon.commit()
+        """
+        Remove sensor from the database
 
+        Parameters
+        ----------
+        sid : str
+            SensorID
+        """
+        self.dbcur.execute(SQL_SENSOR_DEL, (sid,))
+
+    @dbcon
     def sync(self, *sids):
+        """
+        Synchronise data
+
+        Parameters
+        ----------
+        sids : list of str
+            SensorIDs to sync
+            Optional, leave empty to sync everything
+        """
         if sids == ():
             sids = [sid for (sid,) in self.dbcur.execute(SQL_SENSOR_ALL)]
         for sid in sids:
@@ -176,7 +252,21 @@ class Session():
                 rid, lvl, bid = 0, 0, 0
             self._req_sync(sid, rid, lvl, bid)
 
+    @dbcon
     def list(self, *sids):
+        """
+        List all tmpo-blocks in the database
+
+        Parameters
+        ----------
+        sids : list of str
+            SensorID's for which to list blocks
+            Optional, leave empty to get them all
+
+        Returns
+        -------
+        list[list[tuple]]
+        """
         if sids == ():
             sids = [sid for (sid,) in self.dbcur.execute(SQL_SENSOR_ALL)]
         slist = []
@@ -189,8 +279,30 @@ class Session():
             slist.append(tlist)
         return slist
 
+    @dbcon
     def series(self, sid, recycle_id=None, head=0, tail=EPOCHS_MAX,
                datetime=True):
+        """
+        Create data Series
+
+        Parameters
+        ----------
+        sid : str
+        recycle_id : optional
+        head : int | pandas.tslib.Timestamp
+            Start of the interval
+            default earliest available
+        tail : int | pandas.tslib.Timestamp
+            End of the interval
+            default max epoch
+        datetime : bool
+            convert index to datetime
+            default True
+
+        Returns
+        -------
+        pandas.Series
+        """
         head = self._2epochs(head)
         tail = self._2epochs(tail)
         if recycle_id is None:
@@ -212,7 +324,28 @@ class Session():
         else:
             return pd.Series([], name=sid)
 
+    @dbcon
     def dataframe(self, sids, head=0, tail=EPOCHS_MAX, datetime=True):
+        """
+        Create data frame
+
+        Parameters
+        ----------
+        sids : list[str]
+        head : int | pandas.tslib.Timestamp
+            Start of the interval
+            default earliest available
+        tail : int | pandas.tslib.Timestamp
+            End of the interval
+            default max epoch
+        datetime : bool
+            convert index to datetime
+            default True
+
+        Returns
+        -------
+        pandas.DataFrame
+        """
         head = self._2epochs(head)
         tail = self._2epochs(tail)
         series = [self.series(sid, head=head, tail=tail, datetime=False)
@@ -221,6 +354,60 @@ class Session():
         if datetime is True:
             df.index = pd.to_datetime(df.index, unit="s", utc=True)
         return df
+
+    @dbcon
+    def first_timestamp(self, sid, epoch=False):
+        """
+        Get the first available timestamp for a sensor
+
+        Parameters
+        ----------
+        sid : str
+            SensorID
+        epoch : bool
+            default False
+            If True return as epoch
+            If False return as pd.Timestamp
+
+        Returns
+        -------
+        pd.Timestamp | int
+        """
+        first_block = self.dbcur.execute(SQL_TMPO_FIRST, (sid,)).fetchone()
+        if first_block is None:
+            return None
+
+        timestamp = first_block[2]
+        if epoch:
+            return timestamp
+        else:
+            return pd.Timestamp.fromtimestamp(timestamp).tz_localize('UTC')
+
+    @dbcon
+    def last_timestamp(self, sid, epoch=False):
+        """
+        Get the theoretical last timestamp for a sensor
+        It is the mathematical end of the last block, the actual last sensor stamp may be earlier
+
+        Parameters
+        ----------
+        sid : str
+            SensorID
+        epoch : bool
+            default False
+            If True return as epoch
+            If False return as pd.Timestamp
+
+        Returns
+        -------
+        pd.Timestamp | int
+        """
+        rid, lvl, bid = self.dbcur.execute(SQL_TMPO_LAST, (sid,)).fetchone()
+        end_of_block = self._blocktail(lvl, bid)
+        if epoch:
+            return end_of_block
+        else:
+            return pd.Timestamp.fromtimestamp(end_of_block).tz_localize('UTC')
 
     def _2epochs(self, time):
         if isinstance(time, pd.tslib.Timestamp):
@@ -247,9 +434,8 @@ class Session():
         h = json.loads(m.group("h"))
         self._npdelta(pdsblk.index, h["head"][0])
         self._npdelta(pdsblk, h["head"][1])
-        # only truncate if needed (avoids pandas bug and more efficient)
-        # don't use pandas.truncate with integer indices!
-        pdsblk_truncated = pdsblk.loc[max(head, pdsblk.index[0]):min(tail, pdsblk.index[-1])] 
+        # Use the built-in ix method to truncate
+        pdsblk_truncated = pdsblk.ix[head:tail] 
         return pdsblk_truncated
 
     def _npdelta(self, a, delta):
@@ -276,6 +462,7 @@ class Session():
             params=params,
             verify=self.crt)
         r = f.result()
+        r.raise_for_status()
         fs = []
         for t in r.json():
             fs.append((t, self._req_block(
@@ -299,7 +486,6 @@ class Session():
         blk = sqlite3.Binary(r.content)
         now = time.time()
         self.dbcur.execute(SQL_TMPO_INS, (sid, rid, lvl, bid, ext, now, blk))
-        self.dbcon.commit()
         self._clean(sid, rid, lvl, bid)
         self._dprintf(DBG_TMPO_WRITE, now, sid, rid, lvl, bid, len(blk))
 
@@ -308,7 +494,6 @@ class Session():
             return
         lastchild = self._lastchild(lvl, bid)
         self.dbcur.execute(SQL_TMPO_CLEAN, (sid, rid, lvl - 4, lastchild))
-        self.dbcon.commit()
         self._clean(sid, rid, lvl - 4, lastchild)
 
     def _lastchild(self, lvl, bid):

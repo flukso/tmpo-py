@@ -61,3 +61,7 @@ target/
 
 # tmpo cache
 .tmpo
+
+# pycharm
+.idea/*
+
