@@ -402,7 +402,10 @@ class Session():
         -------
         pd.Timestamp | int
         """
-        rid, lvl, bid = self.dbcur.execute(SQL_TMPO_LAST, (sid,)).fetchone()
+        cur = self.dbcur.execute(SQL_TMPO_LAST, (sid,))
+        if cur is None:
+            return None
+        rid, lvl, bid = cur.fetchone()
         end_of_block = self._blocktail(lvl, bid)
         if epoch:
             return end_of_block
