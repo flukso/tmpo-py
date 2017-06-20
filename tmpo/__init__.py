@@ -1,5 +1,5 @@
 __title__ = "tmpo"
-__version__ = "0.2.5"
+__version__ = "0.2.6"
 __build__ = 0x000100
 __author__ = "Bart Van Der Meerssche"
 __license__ = "MIT"
@@ -243,7 +243,7 @@ class Session():
             self.dbcur.execute(SQL_TMPO_LAST, (sid,))
             last = self.dbcur.fetchone()
             if last:
-                rid, lvl, bid = last
+                rid, lvl, bid, ext, blk = last
                 self._clean(sid, rid, lvl, bid)
                 # prevent needless polling
                 if time.time() < bid + 256:
