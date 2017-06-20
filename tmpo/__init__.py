@@ -289,10 +289,10 @@ class Session():
         ----------
         sid : str
         recycle_id : optional
-        head : int | pandas.tslib.Timestamp
+        head : int | pandas.tslib.Timestamp, optional
             Start of the interval
             default earliest available
-        tail : int | pandas.tslib.Timestamp
+        tail : int | pandas.tslib.Timestamp, optional
             End of the interval
             default max epoch
         datetime : bool
@@ -340,10 +340,10 @@ class Session():
         Parameters
         ----------
         sids : list[str]
-        head : int | pandas.tslib.Timestamp
+        head : int | pandas.tslib.Timestamp, optional
             Start of the interval
             default earliest available
-        tail : int | pandas.tslib.Timestamp
+        tail : int | pandas.tslib.Timestamp, optional
             End of the interval
             default max epoch
         datetime : bool
