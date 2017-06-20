@@ -1,5 +1,5 @@
 __title__ = "tmpo"
-__version__ = "0.2.4"
+__version__ = "0.2.5"
 __build__ = 0x000100
 __author__ = "Bart Van Der Meerssche"
 __license__ = "MIT"
@@ -81,7 +81,7 @@ SQL_TMPO_ALL = """
     ORDER BY rid ASC, lvl DESC, bid ASC"""
 
 SQL_TMPO_LAST = """
-    SELECT rid, lvl, bid
+    SELECT rid, lvl, bid, ext, data
     FROM tmpo
     WHERE sid = ?
     ORDER BY created DESC, lvl DESC
@@ -383,11 +383,9 @@ class Session():
         else:
             return pd.Timestamp.fromtimestamp(timestamp).tz_localize('UTC')
 
-    @dbcon
     def last_timestamp(self, sid, epoch=False):
         """
         Get the theoretical last timestamp for a sensor
-        It is the mathematical end of the last block, the actual last sensor stamp may be earlier
 
         Parameters
         ----------
@@ -402,15 +400,53 @@ class Session():
         -------
         pd.Timestamp | int
         """
+        timestamp, value = self.last_datapoint(sid, epoch)
+        return timestamp
+
+    def last_datapoint(self, sid, epoch=False):
+        """
+        Parameters
+        ----------
+        sid : str
+            SensorId
+        epoch : bool
+            default False
+            If True return as epoch
+            If False return as pd.Timestamp
+
+        Returns
+        -------
+        pd.Timestamp | int, float
+        """
+        block = self._last_block(sid)
+        if block is None:
+            return None, None
+
+        header = block['h']
+        timestamp, value = header['tail']
+
+        if not epoch:
+            timestamp = pd.Timestamp.fromtimestamp(timestamp).tz_localize('UTC')
+
+        return timestamp, value
+
+    @dbcon
+    def _last_block(self, sid):
         cur = self.dbcur.execute(SQL_TMPO_LAST, (sid,))
         if cur is None:
             return None
-        rid, lvl, bid = cur.fetchone()
-        end_of_block = self._blocktail(lvl, bid)
-        if epoch:
-            return end_of_block
-        else:
-            return pd.Timestamp.fromtimestamp(end_of_block).tz_localize('UTC')
+
+        rid, lvl, bid, ext, blk = cur.fetchone()
+
+        jblk = self._decompress_block(blk, ext)
+        data = json.loads(jblk.decode('UTF-8'))
+        return data
+
+    def _decompress_block(self, blk, ext):
+        if ext != "gz":
+            raise NotImplementedError("Compression type not supported in tmpo")
+        jblk = zlib.decompress(blk, zlib.MAX_WBITS | 16)  # gzip decoding
+        return jblk
 
     def _2epochs(self, time):
         if isinstance(time, pd.tslib.Timestamp):
@@ -422,9 +458,7 @@ class Session():
                                       "Use epochs or a Pandas timestamp.")
 
     def _blk2series(self, ext, blk, head, tail):
-        if ext != "gz":
-            raise NotImplementedError("Compression type not supported in tmpo")
-        jblk = zlib.decompress(blk, zlib.MAX_WBITS | 16)  # gzip decoding
+        jblk = self._decompress_block(blk, ext)
         m = re.match(RE_JSON_BLK, jblk.decode("utf-8"))
         pdjblk = '{"index":%s,"data":%s}' % (m.group("t"), m.group("v"))
         try:
