@@ -280,7 +280,7 @@ class Session():
         return slist
 
     @dbcon
-    def series(self, sid, recycle_id=None, head=0, tail=EPOCHS_MAX,
+    def series(self, sid, recycle_id=None, head=None, tail=None,
                datetime=True):
         """
         Create data Series
@@ -289,10 +289,10 @@ class Session():
         ----------
         sid : str
         recycle_id : optional
-        head : int | pandas.tslib.Timestamp
+        head : int | pandas.tslib.Timestamp, optional
             Start of the interval
             default earliest available
-        tail : int | pandas.tslib.Timestamp
+        tail : int | pandas.tslib.Timestamp, optional
             End of the interval
             default max epoch
         datetime : bool
@@ -303,8 +303,16 @@ class Session():
         -------
         pandas.Series
         """
-        head = self._2epochs(head)
-        tail = self._2epochs(tail)
+        if head is None:
+            head = 0
+        else:
+            head = self._2epochs(head)
+
+        if tail is None:
+            tail = EPOCHS_MAX
+        else:
+            tail = self._2epochs(tail)
+
         if recycle_id is None:
             self.dbcur.execute(SQL_TMPO_RID_MAX, (sid,))
             recycle_id = self.dbcur.fetchone()[0]
@@ -332,10 +340,10 @@ class Session():
         Parameters
         ----------
         sids : list[str]
-        head : int | pandas.tslib.Timestamp
+        head : int | pandas.tslib.Timestamp, optional
             Start of the interval
             default earliest available
-        tail : int | pandas.tslib.Timestamp
+        tail : int | pandas.tslib.Timestamp, optional
             End of the interval
             default max epoch
         datetime : bool
@@ -346,8 +354,16 @@ class Session():
         -------
         pandas.DataFrame
         """
-        head = self._2epochs(head)
-        tail = self._2epochs(tail)
+        if head is None:
+            head = 0
+        else:
+            head = self._2epochs(head)
+
+        if tail is None:
+            tail = EPOCHS_MAX
+        else:
+            tail = self._2epochs(tail)
+
         series = [self.series(sid, head=head, tail=tail, datetime=False)
                   for sid in sids]
         df = pd.concat(series, axis=1)
