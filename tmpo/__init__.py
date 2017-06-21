@@ -1,5 +1,5 @@
 __title__ = "tmpo"
-__version__ = "0.2.6"
+__version__ = "0.2.7"
 __build__ = 0x000100
 __author__ = "Bart Van Der Meerssche"
 __license__ = "MIT"
@@ -449,10 +449,11 @@ class Session():
     @dbcon
     def _last_block(self, sid):
         cur = self.dbcur.execute(SQL_TMPO_LAST, (sid,))
-        if cur is None:
+        row = cur.fetchone()
+        if row is None:
             return None
 
-        rid, lvl, bid, ext, blk = cur.fetchone()
+        rid, lvl, bid, ext, blk = row
 
         jblk = self._decompress_block(blk, ext)
         data = json.loads(jblk.decode('UTF-8'))
