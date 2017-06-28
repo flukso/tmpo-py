@@ -1,5 +1,5 @@
 __title__ = "tmpo"
-__version__ = "0.2.8"
+__version__ = "0.2.9"
 __build__ = 0x000100
 __author__ = "Bart Van Der Meerssche"
 __license__ = "MIT"
@@ -396,7 +396,7 @@ class Session():
         timestamp = first_block[2]
         if not epoch:
             timestamp = pd.Timestamp.utcfromtimestamp(timestamp)
-            timestamp = timestamp.tz.localize('UTC')
+            timestamp = timestamp.tz_localize('UTC')
         return timestamp
 
     def last_timestamp(self, sid, epoch=False):
