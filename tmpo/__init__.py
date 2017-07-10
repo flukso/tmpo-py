@@ -43,6 +43,10 @@ SQL_SENSOR_DEL = """
     DELETE FROM sensor
     WHERE sid = ?"""
 
+SQL_TMPO_DEL = """
+    DELETE FROM tmpo
+    WHERE sid = ?"""
+
 SQL_SENSOR_ALL = """
     SELECT sid
     FROM sensor
@@ -225,6 +229,7 @@ class Session():
             SensorID
         """
         self.dbcur.execute(SQL_SENSOR_DEL, (sid,))
+        self.dbcur.execute(SQL_TMPO_DEL, (sid,))
 
     @dbcon
     def sync(self, *sids):
