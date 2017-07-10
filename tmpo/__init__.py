@@ -232,6 +232,18 @@ class Session():
         self.dbcur.execute(SQL_TMPO_DEL, (sid,))
 
     @dbcon
+    def reset(self, sid):
+        """
+        Removes all tmpo blocks for a given sensor, but keeps sensor table
+        intact, so sensor id and token remain in the database.
+
+        Parameters
+        ----------
+        sid : str
+        """
+        self.dbcur.execute(SQL_TMPO_DEL, (sid,))
+
+    @dbcon
     def sync(self, *sids):
         """
         Synchronise data
