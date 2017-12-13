@@ -492,8 +492,7 @@ class Session():
         h = json.loads(m.group("h"))
         self._npdelta(pdsblk.index, h["head"][0])
         self._npdelta(pdsblk, h["head"][1])
-        # Use the built-in ix method to truncate
-        pdsblk_truncated = pdsblk.ix[head:tail]
+        pdsblk_truncated = pdsblk.loc[head:tail]
         return pdsblk_truncated
 
     def _npdelta(self, a, delta):
