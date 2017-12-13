@@ -467,7 +467,7 @@ class Session():
         return jblk
 
     def _2epochs(self, time):
-        if isinstance(time, pd.tslib.Timestamp):
+        if isinstance(time, pd.Timestamp):
             return int(math.floor(time.value / 1e9))
         elif isinstance(time, int):
             return time
