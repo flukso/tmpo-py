@@ -607,3 +607,64 @@ class Session():
         dtype = config['data_type']
         subtype = config.get('subtype')
         return com, dtype, subtype
+
+    def get_sensor_data(self, sid, head=0, tail=EPOCHS_MAX, resolution='15min', tz=None):
+        """
+        Get data for a sensor in a format ready for analysis
+
+        Parameters
+        ----------
+        sid : str
+        head : int | pd.Timestamp
+        tail : int | pd.Timestamp
+        resolution : str
+        tz : str
+            IANA time zone
+
+        Returns
+        -------
+        pd.Series
+        """
+        commodity, data_type, subtype = self.get_types(sid=sid)
+
+        ts = self.series(sid=sid, head=head, tail=tail)
+        if ts.dropna().empty:
+            return ts
+        if tz is not None:
+            ts = ts.tz_convert(tz=tz)
+
+        if data_type == 'gauge':
+            ts = ts.resample(rule=resolution).mean()
+
+        elif data_type == 'counter':
+            newindex = ts.resample(rule=resolution).first().index
+            ts = ts.reindex(ts.index.union(newindex))
+            ts = ts.interpolate(method='time')
+            ts = ts.reindex(newindex)
+
+        else:
+            raise NotImplementedError("I don't know the data type {}".format(data_type))
+
+        return ts.dropna()
+
+    def get_data(self, sids, head=0, tail=EPOCHS_MAX, resolution='15min', tz=None):
+        """
+            Get data for a sensor in a format ready for analysis
+
+            Parameters
+            ----------
+            sid : [str]
+            head : int | pd.Timestamp
+            tail : int | pd.Timestamp
+            resolution : str
+            tz : str
+                IANA time zone
+
+            Returns
+            -------
+            pd.DataFrame
+        """
+        series = [self.get_sensor_data(sid=sid, head=head, tail=tail, resolution=resolution, tz=tz)
+                  for sid in sids]
+        df = pd.concat(series, axis=1)
+        return df
