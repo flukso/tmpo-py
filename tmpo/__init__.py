@@ -1,5 +1,5 @@
 __title__ = "tmpo"
-__version__ = "0.2.9"
+__version__ = "0.2.10"
 __build__ = 0x000100
 __author__ = "Bart Van Der Meerssche"
 __license__ = "MIT"
@@ -41,6 +41,10 @@ SQL_SENSOR_INS = """
 
 SQL_SENSOR_DEL = """
     DELETE FROM sensor
+    WHERE sid = ?"""
+
+SQL_TMPO_DEL = """
+    DELETE FROM tmpo
     WHERE sid = ?"""
 
 SQL_SENSOR_ALL = """
@@ -232,6 +236,19 @@ class Session():
             SensorID
         """
         self.dbcur.execute(SQL_SENSOR_DEL, (sid,))
+        self.dbcur.execute(SQL_TMPO_DEL, (sid,))
+
+    @dbcon
+    def reset(self, sid):
+        """
+        Removes all tmpo blocks for a given sensor, but keeps sensor table
+        intact, so sensor id and token remain in the database.
+
+        Parameters
+        ----------
+        sid : str
+        """
+        self.dbcur.execute(SQL_TMPO_DEL, (sid,))
 
     @dbcon
     def sync(self, *sids):
