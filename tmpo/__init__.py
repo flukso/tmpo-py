@@ -1,5 +1,5 @@
 __title__ = "tmpo"
-__version__ = "0.2.8"
+__version__ = "0.2.9"
 __build__ = 0x000100
 __author__ = "Bart Van Der Meerssche"
 __license__ = "MIT"
@@ -289,10 +289,10 @@ class Session():
         ----------
         sid : str
         recycle_id : optional
-        head : int | pandas.tslib.Timestamp, optional
+        head : int | pandas.Timestamp, optional
             Start of the interval
             default earliest available
-        tail : int | pandas.tslib.Timestamp, optional
+        tail : int | pandas.Timestamp, optional
             End of the interval
             default max epoch
         datetime : bool
@@ -340,10 +340,10 @@ class Session():
         Parameters
         ----------
         sids : list[str]
-        head : int | pandas.tslib.Timestamp, optional
+        head : int | pandas.Timestamp, optional
             Start of the interval
             default earliest available
-        tail : int | pandas.tslib.Timestamp, optional
+        tail : int | pandas.Timestamp, optional
             End of the interval
             default max epoch
         datetime : bool
@@ -467,7 +467,7 @@ class Session():
         return jblk
 
     def _2epochs(self, time):
-        if isinstance(time, pd.tslib.Timestamp):
+        if isinstance(time, pd.Timestamp):
             return int(math.floor(time.value / 1e9))
         elif isinstance(time, int):
             return time
@@ -492,8 +492,7 @@ class Session():
         h = json.loads(m.group("h"))
         self._npdelta(pdsblk.index, h["head"][0])
         self._npdelta(pdsblk, h["head"][1])
-        # Use the built-in ix method to truncate
-        pdsblk_truncated = pdsblk.ix[head:tail]
+        pdsblk_truncated = pdsblk.loc[head:tail]
         return pdsblk_truncated
 
     def _npdelta(self, a, delta):
