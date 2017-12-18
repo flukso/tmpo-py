@@ -81,6 +81,13 @@ SQL_TMPO_ALL = """
     ORDER BY rid ASC, lvl DESC, bid ASC"""
 
 SQL_TMPO_LAST = """
+    SELECT rid, lvl, bid, ext
+    FROM tmpo
+    WHERE sid = ?
+    ORDER BY created DESC, lvl DESC
+    LIMIT 1"""
+
+SQL_TMPO_LAST_DATA = """
     SELECT rid, lvl, bid, ext, data
     FROM tmpo
     WHERE sid = ?
@@ -243,7 +250,7 @@ class Session():
             self.dbcur.execute(SQL_TMPO_LAST, (sid,))
             last = self.dbcur.fetchone()
             if last:
-                rid, lvl, bid, ext, blk = last
+                rid, lvl, bid, ext = last
                 self._clean(sid, rid, lvl, bid)
                 # prevent needless polling
                 if time.time() < bid + 256:
@@ -396,7 +403,7 @@ class Session():
         timestamp = first_block[2]
         if not epoch:
             timestamp = pd.Timestamp.utcfromtimestamp(timestamp)
-            timestamp = timestamp.tz.localize('UTC')
+            timestamp = timestamp.tz_localize('UTC')
         return timestamp
 
     def last_timestamp(self, sid, epoch=False):
@@ -449,7 +456,7 @@ class Session():
 
     @dbcon
     def _last_block(self, sid):
-        cur = self.dbcur.execute(SQL_TMPO_LAST, (sid,))
+        cur = self.dbcur.execute(SQL_TMPO_LAST_DATA, (sid,))
         row = cur.fetchone()
         if row is None:
             return None
