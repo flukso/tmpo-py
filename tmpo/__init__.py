@@ -588,3 +588,22 @@ class Session():
     def _dprintf(self, fmt, *args):
         if self.debug:
             print(fmt % args)
+
+    def get_types(self, sid):
+        """
+        Get commodity and data type (counter or gauge), and subtype (optional)
+
+        Parameters
+        ----------
+        sid : str
+
+        Returns
+        -------
+        (str, str, str)
+        """
+        last_block = self._last_block(sid=sid)
+        config = last_block['h']['cfg']
+        com = config['type']
+        dtype = config['data_type']
+        subtype = config.get('subtype')
+        return com, dtype, subtype
