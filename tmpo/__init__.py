@@ -1,5 +1,5 @@
 __title__ = "tmpo"
-__version__ = "0.2.8"
+__version__ = "0.2.10"
 __build__ = 0x000100
 __author__ = "Bart Van Der Meerssche"
 __license__ = "MIT"
@@ -43,6 +43,10 @@ SQL_SENSOR_DEL = """
     DELETE FROM sensor
     WHERE sid = ?"""
 
+SQL_TMPO_DEL = """
+    DELETE FROM tmpo
+    WHERE sid = ?"""
+
 SQL_SENSOR_ALL = """
     SELECT sid
     FROM sensor
@@ -81,6 +85,13 @@ SQL_TMPO_ALL = """
     ORDER BY rid ASC, lvl DESC, bid ASC"""
 
 SQL_TMPO_LAST = """
+    SELECT rid, lvl, bid, ext
+    FROM tmpo
+    WHERE sid = ?
+    ORDER BY created DESC, lvl DESC
+    LIMIT 1"""
+
+SQL_TMPO_LAST_DATA = """
     SELECT rid, lvl, bid, ext, data
     FROM tmpo
     WHERE sid = ?
@@ -225,6 +236,19 @@ class Session():
             SensorID
         """
         self.dbcur.execute(SQL_SENSOR_DEL, (sid,))
+        self.dbcur.execute(SQL_TMPO_DEL, (sid,))
+
+    @dbcon
+    def reset(self, sid):
+        """
+        Removes all tmpo blocks for a given sensor, but keeps sensor table
+        intact, so sensor id and token remain in the database.
+
+        Parameters
+        ----------
+        sid : str
+        """
+        self.dbcur.execute(SQL_TMPO_DEL, (sid,))
 
     @dbcon
     def sync(self, *sids):
@@ -243,7 +267,7 @@ class Session():
             self.dbcur.execute(SQL_TMPO_LAST, (sid,))
             last = self.dbcur.fetchone()
             if last:
-                rid, lvl, bid, ext, blk = last
+                rid, lvl, bid, ext = last
                 self._clean(sid, rid, lvl, bid)
                 # prevent needless polling
                 if time.time() < bid + 256:
@@ -289,10 +313,10 @@ class Session():
         ----------
         sid : str
         recycle_id : optional
-        head : int | pandas.tslib.Timestamp, optional
+        head : int | pandas.Timestamp, optional
             Start of the interval
             default earliest available
-        tail : int | pandas.tslib.Timestamp, optional
+        tail : int | pandas.Timestamp, optional
             End of the interval
             default max epoch
         datetime : bool
@@ -340,10 +364,10 @@ class Session():
         Parameters
         ----------
         sids : list[str]
-        head : int | pandas.tslib.Timestamp, optional
+        head : int | pandas.Timestamp, optional
             Start of the interval
             default earliest available
-        tail : int | pandas.tslib.Timestamp, optional
+        tail : int | pandas.Timestamp, optional
             End of the interval
             default max epoch
         datetime : bool
@@ -396,7 +420,7 @@ class Session():
         timestamp = first_block[2]
         if not epoch:
             timestamp = pd.Timestamp.utcfromtimestamp(timestamp)
-            timestamp = timestamp.tz.localize('UTC')
+            timestamp = timestamp.tz_localize('UTC')
         return timestamp
 
     def last_timestamp(self, sid, epoch=False):
@@ -449,7 +473,7 @@ class Session():
 
     @dbcon
     def _last_block(self, sid):
-        cur = self.dbcur.execute(SQL_TMPO_LAST, (sid,))
+        cur = self.dbcur.execute(SQL_TMPO_LAST_DATA, (sid,))
         row = cur.fetchone()
         if row is None:
             return None
@@ -467,7 +491,7 @@ class Session():
         return jblk
 
     def _2epochs(self, time):
-        if isinstance(time, pd.tslib.Timestamp):
+        if isinstance(time, pd.Timestamp):
             return int(math.floor(time.value / 1e9))
         elif isinstance(time, int):
             return time
@@ -492,8 +516,7 @@ class Session():
         h = json.loads(m.group("h"))
         self._npdelta(pdsblk.index, h["head"][0])
         self._npdelta(pdsblk, h["head"][1])
-        # Use the built-in ix method to truncate
-        pdsblk_truncated = pdsblk.ix[head:tail]
+        pdsblk_truncated = pdsblk.loc[head:tail]
         return pdsblk_truncated
 
     def _npdelta(self, a, delta):
