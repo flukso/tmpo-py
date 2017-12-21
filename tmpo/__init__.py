@@ -674,3 +674,22 @@ class Session():
         series = [s for s in series if not s.empty]
         df = pd.concat(series, axis=1)
         return df
+
+    def get_unit(self, sid):
+        """
+        Get unit of a sensor
+
+        Parameters
+        ----------
+        sid : str
+
+        Returns
+        -------
+        str
+        """
+        last_block = self._last_block(sid=sid)
+        if last_block is None:
+            return None
+        config = last_block['h']['cfg']
+        unit = config.get('unit')
+        return unit
