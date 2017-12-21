@@ -602,6 +602,8 @@ class Session():
         (str, str, str)
         """
         last_block = self._last_block(sid=sid)
+        if last_block is None:
+            raise LookupError('Sensor {} has no data'.format(sid))
         config = last_block['h']['cfg']
         com = config['type']
         dtype = config['data_type']
@@ -625,7 +627,10 @@ class Session():
         -------
         pd.Series
         """
-        commodity, data_type, subtype = self.get_types(sid=sid)
+        try:
+            commodity, data_type, subtype = self.get_types(sid=sid)
+        except LookupError:  # no data
+            return pd.Series()
 
         ts = self.series(sid=sid, head=head, tail=tail)
         if ts.dropna().empty:
@@ -666,5 +671,6 @@ class Session():
         """
         series = [self.get_sensor_data(sid=sid, head=head, tail=tail, resolution=resolution, tz=tz)
                   for sid in sids]
+        series = [s for s in series if not s.empty]
         df = pd.concat(series, axis=1)
         return df
