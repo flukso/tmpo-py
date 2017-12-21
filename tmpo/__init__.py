@@ -692,4 +692,6 @@ class Session():
             return None
         config = last_block['h']['cfg']
         unit = config.get('unit')
+        if unit == '':
+            return None
         return unit
