@@ -672,9 +672,9 @@ class Session():
         series = (self.get_sensor_data(sid=sid, head=head, tail=tail, resolution=resolution, tz=tz)
                   for sid in sids)
         series = (s for s in series if not s.empty)
-        if series:
+        try:
             df = pd.concat(series, axis=1)
-        else:
+        except ValueError:
             df = pd.DataFrame()
         return df
 
