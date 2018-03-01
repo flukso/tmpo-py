@@ -669,9 +669,9 @@ class Session():
             -------
             pd.DataFrame
         """
-        series = [self.get_sensor_data(sid=sid, head=head, tail=tail, resolution=resolution, tz=tz)
-                  for sid in sids]
-        series = [s for s in series if not s.empty]
+        series = (self.get_sensor_data(sid=sid, head=head, tail=tail, resolution=resolution, tz=tz)
+                  for sid in sids)
+        series = (s for s in series if not s.empty)
         if series:
             df = pd.concat(series, axis=1)
         else:
