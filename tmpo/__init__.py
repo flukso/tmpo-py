@@ -610,7 +610,7 @@ class Session():
         subtype = config.get('subtype')
         return com, dtype, subtype
 
-    def get_sensor_data(self, sid, head=0, tail=EPOCHS_MAX, resolution='15min', tz=None):
+    def get_sensor_data(self, sid, head=0, tail=EPOCHS_MAX, resolution='15min', tz=None, diff=False):
         """
         Get data for a sensor in a format ready for analysis
 
@@ -622,6 +622,9 @@ class Session():
         resolution : str
         tz : str
             IANA time zone
+        diff : bool
+            default False
+            if the sensor is a counter, return the difference between values
 
         Returns
         -------
@@ -646,13 +649,15 @@ class Session():
             ts = ts.reindex(ts.index.union(newindex))
             ts = ts.interpolate(method='time')
             ts = ts.reindex(newindex)
+            if diff:
+                ts = ts.diff()
 
         else:
             raise NotImplementedError("I don't know the data type {}".format(data_type))
 
         return ts.dropna()
 
-    def get_data(self, sids, head=0, tail=EPOCHS_MAX, resolution='15min', tz=None):
+    def get_data(self, sids, head=0, tail=EPOCHS_MAX, resolution='15min', tz=None, diff=False):
         """
             Get data for a sensor in a format ready for analysis
 
@@ -664,12 +669,15 @@ class Session():
             resolution : str
             tz : str
                 IANA time zone
+            diff : bool
+                default False
+                if the sensor is a counter, return the difference between values
 
             Returns
             -------
             pd.DataFrame
         """
-        series = (self.get_sensor_data(sid=sid, head=head, tail=tail, resolution=resolution, tz=tz)
+        series = (self.get_sensor_data(sid=sid, head=head, tail=tail, resolution=resolution, tz=tz, diff=diff)
                   for sid in sids)
         series = (s for s in series if not s.empty)
         try:
