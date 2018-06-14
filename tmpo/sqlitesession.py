@@ -80,32 +80,17 @@ SQL_TMPO_RID_MAX = """
     FROM tmpo
     WHERE sid = ?"""
 
-API_TMPO_SYNC = "https://%s/sensor/%s/tmpo/sync"
-API_TMPO_BLOCK = "https://%s/sensor/%s/tmpo/%d/%d/%d"
-
-HTTP_ACCEPT = {
-    "json": "application/json",
-    "gz": "application/gzip"}
-
-RE_JSON_BLK = r'^\{"h":(?P<h>\{.+?\}),"t":(?P<t>\[.+?\]),"v":(?P<v>\[.+?\])\}$'
-DBG_TMPO_REQUEST = "[r] time:%.3f sid:%s rid:%d lvl:%2d bid:%d"
 DBG_TMPO_WRITE = "[w] time:%.3f sid:%s rid:%d lvl:%2d bid:%d size[B]:%d"
-EPOCHS_MAX = 2147483647
 
 
 import os
 import sys
-import math
 import time
 import sqlite3
-import requests_futures.sessions
-import concurrent.futures
-import zlib
-import re
 import json
-import numpy as np
 import pandas as pd
 from functools import wraps
+from .apisession import APISession, EPOCHS_MAX
 
 
 def dbcon(func):
@@ -144,17 +129,18 @@ def dbcon(func):
     return wrapper
 
 
-class SQLiteSession():
+class SQLiteSession(APISession):
     def __init__(self, path=None, workers=16):
         """
         Parameters
         ----------
         path : str, optional
-            location for the database
+            location for the sqlite database
         workers : int
             default 16
         """
-        self.debug = False
+        super(SQLiteSession, self).__init__(workers=workers)
+
         if path is None:
             path = os.path.expanduser("~") # $HOME
         if sys.platform == "win32":
@@ -163,17 +149,11 @@ class SQLiteSession():
             self.home = os.path.join(path, ".tmpo")
         self.db = os.path.join(self.home, "tmpo.sqlite3")
 
-        package_dir = os.path.dirname(__file__)
-        self.crt = os.path.join(package_dir, ".flukso.crt")
-        self.host = "api.flukso.net"
         try:
             os.mkdir(self.home)
         except OSError:  # dir exists
             pass
-        self.rqs = requests_futures.sessions.FuturesSession(
-            executor=concurrent.futures.ThreadPoolExecutor(
-                max_workers=workers))
-        self.rqs.headers.update({"X-Version": "1.0"})
+
         self.dbcon = None
         self.dbcur = None
 
@@ -273,7 +253,7 @@ class SQLiteSession():
 
     @dbcon
     def series(self, sid, recycle_id=None, head=None, tail=None,
-               datetime=True):
+               datetime=True, **kwargs):
         """
         Create data Series
 
@@ -324,14 +304,13 @@ class SQLiteSession():
         else:
             return pd.Series([], name=sid)
 
-    @dbcon
     def dataframe(self, sids, head=0, tail=EPOCHS_MAX, datetime=True):
         """
         Create data frame
 
         Parameters
         ----------
-        sids : list[str]
+        sids : [str]
         head : int | pandas.Timestamp, optional
             Start of the interval
             default earliest available
@@ -344,27 +323,15 @@ class SQLiteSession():
 
         Returns
         -------
-        pandas.DataFrame
+        pd.DataFrame
         """
-        if head is None:
-            head = 0
-        else:
-            head = self._2epochs(head)
-
-        if tail is None:
-            tail = EPOCHS_MAX
-        else:
-            tail = self._2epochs(tail)
-
-        series = [self.series(sid, head=head, tail=tail, datetime=False)
-                  for sid in sids]
-        df = pd.concat(series, axis=1)
-        if datetime is True:
-            df.index = pd.to_datetime(df.index, unit="s", utc=True)
+        sids = [(sid, None) for sid in sids]
+        df = super(SQLiteSession, self).dataframe(sids=sids, head=head,
+                                                  tail=tail, datetime=datetime)
         return df
 
     @dbcon
-    def first_timestamp(self, sid, epoch=False):
+    def first_timestamp(self, sid, epoch=False, **kwargs):
         """
         Get the first available timestamp for a sensor
 
@@ -387,60 +354,47 @@ class SQLiteSession():
 
         timestamp = first_block[2]
         if not epoch:
-            timestamp = pd.Timestamp.utcfromtimestamp(timestamp)
-            timestamp = timestamp.tz_localize('UTC')
+            timestamp = self._epoch2timestamp(timestamp)
         return timestamp
 
-    def last_timestamp(self, sid, epoch=False):
+    def last_timestamp(self, sid, epoch=False, **kwargs):
         """
-        Get the theoretical last timestamp for a sensor
+        Get the last timestamp for a sensor
 
         Parameters
         ----------
         sid : str
-            SensorID
         epoch : bool
-            default False
-            If True return as epoch
-            If False return as pd.Timestamp
+        kwargs : dict
 
         Returns
         -------
-        pd.Timestamp | int
-        """
-        timestamp, value = self.last_datapoint(sid, epoch)
-        return timestamp
 
-    def last_datapoint(self, sid, epoch=False):
         """
+        last = super(SQLiteSession, self).last_timestamp(
+            sid=sid, token=kwargs.get('token'), epoch=epoch)
+        return last
+
+    def last_datapoint(self, sid, epoch=False, **kwargs):
+        """
+        Get the last datapoint for a sensor
+
         Parameters
         ----------
         sid : str
-            SensorId
         epoch : bool
-            default False
-            If True return as epoch
-            If False return as pd.Timestamp
+        kwargs : dict
 
         Returns
         -------
-        pd.Timestamp | int, float
+        (pd.Timestamp, float) or (int, float)
         """
-        block = self._last_block(sid)
-        if block is None:
-            return None, None
-
-        header = block['h']
-        timestamp, value = header['tail']
-
-        if not epoch:
-            timestamp = pd.Timestamp.utcfromtimestamp(timestamp)
-            timestamp = timestamp.tz_localize('UTC')
-
-        return timestamp, value
+        dp = super(SQLiteSession, self).last_datapoint(
+            sid=sid, token=kwargs.get('token'), epoch=epoch)
+        return dp
 
     @dbcon
-    def _last_block(self, sid):
+    def _last_block(self, sid, **kwargs):
         cur = self.dbcur.execute(SQL_TMPO_LAST_DATA, (sid,))
         row = cur.fetchone()
         if row is None:
@@ -452,84 +406,15 @@ class SQLiteSession():
         data = json.loads(jblk.decode('UTF-8'))
         return data
 
-    def _decompress_block(self, blk, ext):
-        if ext != "gz":
-            raise NotImplementedError("Compression type not supported in tmpo")
-        jblk = zlib.decompress(blk, zlib.MAX_WBITS | 16)  # gzip decoding
-        return jblk
-
-    def _2epochs(self, time):
-        if isinstance(time, pd.Timestamp):
-            return int(math.floor(time.value / 1e9))
-        elif isinstance(time, int):
-            return time
-        else:
-            raise NotImplementedError("Time format not supported. " +
-                                      "Use epochs or a Pandas timestamp.")
-
-    def _blk2series(self, ext, blk, head, tail):
-        jblk = self._decompress_block(blk, ext)
-        m = re.match(RE_JSON_BLK, jblk.decode("utf-8"))
-        pdjblk = '{"index":%s,"data":%s}' % (m.group("t"), m.group("v"))
-        try:
-            pdsblk = pd.read_json(
-                pdjblk,
-                typ="series",
-                dtype="float",
-                orient="split",
-                numpy=True,
-                date_unit="s")
-        except:
-            return pd.Series()
-        h = json.loads(m.group("h"))
-        self._npdelta(pdsblk.index, h["head"][0])
-        self._npdelta(pdsblk, h["head"][1])
-        pdsblk_truncated = pdsblk.loc[head:tail]
-        return pdsblk_truncated
-
-    def _npdelta(self, a, delta):
-        """Numpy: Modifying Array Values
-            http://docs.scipy.org/doc/numpy/reference/arrays.nditer.html"""
-        for x in np.nditer(a, op_flags=["readwrite"]):
-            delta += x
-            x[...] = delta
-        return a
-
     def _req_sync(self, sid, rid, lvl, bid):
         self.dbcur.execute(SQL_SENSOR_TOKEN, (sid,))
         token, = self.dbcur.fetchone()
-        headers = {
-            "Accept": HTTP_ACCEPT["json"],
-            "X-Token": token}
-        params = {
-            "rid": rid,
-            "lvl": lvl,
-            "bid": bid}
-        f = self.rqs.get(
-            API_TMPO_SYNC % (self.host, sid),
-            headers=headers,
-            params=params,
-            verify=self.crt)
-        r = f.result()
-        r.raise_for_status()
-        fs = []
-        for t in r.json():
-            fs.append((t, self._req_block(
-                sid, token, t["rid"], t["lvl"], t["bid"], t["ext"])))
+        blist = self._req_blocklist(sid=sid, token=token, rid=rid, lvl=lvl,
+                                    bid=bid)
+        fs = self._req_blocks(sid=sid, token=token, blist=blist)
         for (t, f) in fs:
             self._write_block(
                 f.result(), sid, t["rid"], t["lvl"], t["bid"], t["ext"])
-
-    def _req_block(self, sid, token, rid, lvl, bid, ext):
-        headers = {
-            "Accept": HTTP_ACCEPT["gz"],
-            "X-Token": token}
-        f = self.rqs.get(
-            API_TMPO_BLOCK % (self.host, sid, rid, lvl, bid),
-            headers=headers,
-            verify=self.crt)
-        self._dprintf(DBG_TMPO_REQUEST, time.time(), sid, rid, lvl, bid)
-        return f
 
     def _write_block(self, r, sid, rid, lvl, bid, ext):
         blk = sqlite3.Binary(r.content)
@@ -544,15 +429,3 @@ class SQLiteSession():
         lastchild = self._lastchild(lvl, bid)
         self.dbcur.execute(SQL_TMPO_CLEAN, (sid, rid, lvl - 4, lastchild))
         self._clean(sid, rid, lvl - 4, lastchild)
-
-    def _lastchild(self, lvl, bid):
-        delta = math.trunc(2 ** (lvl - 4))
-        return bid + 15 * delta
-
-    def _blocktail(self, lvl, bid):
-        delta = math.trunc(2 ** lvl)
-        return bid + delta
-
-    def _dprintf(self, fmt, *args):
-        if self.debug:
-            print(fmt % args)
