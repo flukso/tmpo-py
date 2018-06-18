@@ -6,4 +6,5 @@ __license__ = "MIT"
 __copyright__ = "Copyright 2017 Bart Van Der Meerssche"
 
 from .sqlitesession import SQLiteSession as Session
+from .sqlitesession import SQLiteSession
 from .apisession import APISession
