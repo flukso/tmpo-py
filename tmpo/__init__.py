@@ -1,5 +1,5 @@
 __title__ = "tmpo"
-__version__ = "0.2.10"
+__version__ = "0.2.11"
 __build__ = 0x000100
 __author__ = "Bart Van Der Meerssche"
 __license__ = "MIT"
@@ -588,3 +588,121 @@ class Session():
     def _dprintf(self, fmt, *args):
         if self.debug:
             print(fmt % args)
+
+    def get_types(self, sid):
+        """
+        Get commodity and data type (counter or gauge), and subtype (optional)
+
+        Parameters
+        ----------
+        sid : str
+
+        Returns
+        -------
+        (str, str, str)
+        """
+        last_block = self._last_block(sid=sid)
+        if last_block is None:
+            raise LookupError('Sensor {} has no data'.format(sid))
+        config = last_block['h']['cfg']
+        com = config['type']
+        dtype = config['data_type']
+        subtype = config.get('subtype')
+        return com, dtype, subtype
+
+    def get_sensor_data(self, sid, head=0, tail=EPOCHS_MAX, resolution='15min', tz=None, diff=False):
+        """
+        Get data for a sensor in a format ready for analysis
+
+        Parameters
+        ----------
+        sid : str
+        head : int | pd.Timestamp
+        tail : int | pd.Timestamp
+        resolution : str
+        tz : str
+            IANA time zone
+        diff : bool
+            default False
+            if the sensor is a counter, return the difference between values
+
+        Returns
+        -------
+        pd.Series
+        """
+        try:
+            commodity, data_type, subtype = self.get_types(sid=sid)
+        except LookupError:  # no data
+            return pd.Series()
+
+        ts = self.series(sid=sid, head=head, tail=tail)
+        if ts.dropna().empty:
+            return ts
+        if tz is not None:
+            ts = ts.tz_convert(tz=tz)
+
+        if data_type == 'gauge':
+            ts = ts.resample(rule=resolution).mean()
+
+        elif data_type == 'counter':
+            newindex = ts.resample(rule=resolution).first().index
+            ts = ts.reindex(ts.index.union(newindex))
+            ts = ts.interpolate(method='time')
+            ts = ts.reindex(newindex)
+            if diff:
+                ts = ts.diff()
+
+        else:
+            raise NotImplementedError("I don't know the data type {}".format(data_type))
+
+        return ts.dropna()
+
+    def get_data(self, sids, head=0, tail=EPOCHS_MAX, resolution='15min', tz=None, diff=False):
+        """
+            Get data for a sensor in a format ready for analysis
+
+            Parameters
+            ----------
+            sid : [str]
+            head : int | pd.Timestamp
+            tail : int | pd.Timestamp
+            resolution : str
+            tz : str
+                IANA time zone
+            diff : bool
+                default False
+                if the sensor is a counter, return the difference between values
+
+            Returns
+            -------
+            pd.DataFrame
+        """
+        series = (self.get_sensor_data(sid=sid, head=head, tail=tail, resolution=resolution, tz=tz, diff=diff)
+                  for sid in sids)
+        series = (s for s in series if not s.empty)
+        try:
+            df = pd.concat(series, axis=1)
+        except ValueError:
+            df = pd.DataFrame()
+        return df
+
+    def get_unit(self, sid):
+        """
+        Get unit of a sensor
+
+        Parameters
+        ----------
+        sid : str
+
+        Returns
+        -------
+        str
+        """
+        last_block = self._last_block(sid=sid)
+        if last_block is None:
+            return None
+        config = last_block['h']['cfg']
+        unit = config.get('unit')
+        if unit == '':
+            return None
+        return unit
