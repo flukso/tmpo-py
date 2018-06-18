@@ -83,6 +83,7 @@ setup(
     # Note: for creating the source distribution, they had to be included in the
     # MANIFEST.in as well. 
     package_data={
-        'tmpo': ['tmpo.ipynb', 'LICENSE', 'README.md'],
+        'tmpo': ['LICENSE', 'README.md', 'tmpo/.flukso.crt'],
     },
+    include_package_data=True,
 )
