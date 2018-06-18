@@ -81,7 +81,7 @@ class APISession:
         -------
         pd.Series
         """
-        token = token if token else self.sensors.get(sid)
+        token = token if token else self.sensors[sid]
 
         if head is None:
             head = 0
@@ -161,7 +161,7 @@ class APISession:
         -------
         pd.Timestamp | int
         """
-        token = token if token else self.sensors.get(sid)
+        token = token if token else self.sensors[sid]
 
         blist = self._req_blocklist(sid=sid, token=token)
         first = blist[0]['bid']
@@ -220,7 +220,7 @@ class APISession:
         return timestamp, value
 
     def _last_block(self, sid, token=None):
-        token = token if token else self.sensors.get(sid)
+        token = token if token else self.sensors[sid]
 
         blist = self._req_blocklist(sid=sid, token=token)
         last = blist[-1]
