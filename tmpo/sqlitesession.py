@@ -304,32 +304,6 @@ class SQLiteSession(APISession):
         else:
             return pd.Series([], name=sid)
 
-    def dataframe(self, sids, head=0, tail=EPOCHS_MAX, datetime=True):
-        """
-        Create data frame
-
-        Parameters
-        ----------
-        sids : [str]
-        head : int | pandas.Timestamp, optional
-            Start of the interval
-            default earliest available
-        tail : int | pandas.Timestamp, optional
-            End of the interval
-            default max epoch
-        datetime : bool
-            convert index to datetime
-            default True
-
-        Returns
-        -------
-        pd.DataFrame
-        """
-        sids = [(sid, None) for sid in sids]
-        df = super(SQLiteSession, self).dataframe(sids=sids, head=head,
-                                                  tail=tail, datetime=datetime)
-        return df
-
     @dbcon
     def first_timestamp(self, sid, epoch=False, **kwargs):
         """
@@ -356,42 +330,6 @@ class SQLiteSession(APISession):
         if not epoch:
             timestamp = self._epoch2timestamp(timestamp)
         return timestamp
-
-    def last_timestamp(self, sid, epoch=False, **kwargs):
-        """
-        Get the last timestamp for a sensor
-
-        Parameters
-        ----------
-        sid : str
-        epoch : bool
-        kwargs : dict
-
-        Returns
-        -------
-
-        """
-        last = super(SQLiteSession, self).last_timestamp(
-            sid=sid, token=kwargs.get('token'), epoch=epoch)
-        return last
-
-    def last_datapoint(self, sid, epoch=False, **kwargs):
-        """
-        Get the last datapoint for a sensor
-
-        Parameters
-        ----------
-        sid : str
-        epoch : bool
-        kwargs : dict
-
-        Returns
-        -------
-        (pd.Timestamp, float) or (int, float)
-        """
-        dp = super(SQLiteSession, self).last_datapoint(
-            sid=sid, token=kwargs.get('token'), epoch=epoch)
-        return dp
 
     @dbcon
     def _last_block(self, sid, **kwargs):

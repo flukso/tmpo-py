@@ -43,15 +43,29 @@ class APISession:
                 max_workers=workers))
         self.rqs.headers.update({"X-Version": "1.0"})
 
-    def series(self, sid, token, recycle_id=None, head=None, tail=None,
-               datetime=True):
+        self.sensors = {}
+
+    def add(self, sid, token):
+        """
+        Add a sensor and token to the client, so you don't have to enter the
+        token for each call (also for compatibility with sqlitesession)
+
+        Parameters
+        ----------
+        sid : str
+        token : str
+        """
+        self.sensors.update({sid: token})
+
+    def series(self, sid, recycle_id=None, head=None, tail=None,
+               datetime=True, token=None):
         """
         Create data Series
 
         Parameters
         ----------
         sid : str
-        token : str
+        token : str, optional
         recycle_id : optional
         head : int | pandas.Timestamp, optional
             Start of the interval
@@ -67,6 +81,8 @@ class APISession:
         -------
         pd.Series
         """
+        token = token if token else self.sensors.get(sid)
+
         if head is None:
             head = 0
         else:
@@ -104,8 +120,8 @@ class APISession:
 
         Parameters
         ----------
-        sids : [(str, str)]
-            List of sensor, token tuples: [(sid, token), ...]
+        sids : [str]
+            List of SensorID's
         head : int | pandas.Timestamp, optional
             Start of the interval
             default earliest available
@@ -120,14 +136,14 @@ class APISession:
         -------
         pd.DataFrame
         """
-        series = (self.series(sid, token=token, head=head, tail=tail, datetime=False)
-                  for sid, token in sids)
+        series = (self.series(sid, head=head, tail=tail, datetime=False)
+                  for sid in sids)
         df = pd.concat(series, axis=1)
         if datetime is True:
             df.index = pd.to_datetime(df.index, unit="s", utc=True)
         return df
 
-    def first_timestamp(self, sid, token, epoch=False):
+    def first_timestamp(self, sid, token=None, epoch=False):
         """
         Get the first available timestamp for a sensor
 
@@ -135,6 +151,7 @@ class APISession:
         ----------
         sid : str
             SensorID
+        token : str, optional
         epoch : bool
             default False
             If True return as epoch
@@ -144,13 +161,15 @@ class APISession:
         -------
         pd.Timestamp | int
         """
+        token = token if token else self.sensors.get(sid)
+
         blist = self._req_blocklist(sid=sid, token=token)
         first = blist[0]['bid']
         if not epoch:
             first = self._epoch2timestamp(first)
         return first
 
-    def last_timestamp(self, sid, token, epoch=False):
+    def last_timestamp(self, sid, token=None, epoch=False):
         """
         Get the last timestamp for a sensor
 
@@ -158,6 +177,7 @@ class APISession:
         ----------
         sid : str
             SensorID
+        token: str, optional
         token : str
         epoch : bool
             default False
@@ -171,13 +191,13 @@ class APISession:
         last, _v = self.last_datapoint(sid=sid, token=token, epoch=epoch)
         return last
 
-    def last_datapoint(self, sid, token, epoch=False):
+    def last_datapoint(self, sid, token=None, epoch=False):
         """
         Parameters
         ----------
         sid : str
             SensorId
-        token : str
+        token : str, optional
         epoch : bool
             default False
             If True return as epoch
@@ -199,7 +219,9 @@ class APISession:
 
         return timestamp, value
 
-    def _last_block(self, sid, token):
+    def _last_block(self, sid, token=None):
+        token = token if token else self.sensors.get(sid)
+
         blist = self._req_blocklist(sid=sid, token=token)
         last = blist[-1]
         bf = self._req_block(sid=sid, token=token, rid=last['rid'],
