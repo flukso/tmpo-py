@@ -95,6 +95,8 @@ class APISession:
 
         blist = self._req_blocklist(sid=sid, token=token, rid=recycle_id)
         blist = self._slice_blist(blist=blist, head=head, tail=tail)
+        if len(blist) == 0:
+            return pd.Series([], name=sid)
         blocks_futures = self._req_blocks(sid=sid, token=token, blist=blist)
 
         def parse_blocks():
