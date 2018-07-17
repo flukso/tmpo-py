@@ -166,6 +166,8 @@ class APISession:
         token = token if token else self.sensors[sid]
 
         blist = self._req_blocklist(sid=sid, token=token)
+        if len(blist) == 0:
+            return None
         first = blist[0]['bid']
         if not epoch:
             first = self._epoch2timestamp(first)
