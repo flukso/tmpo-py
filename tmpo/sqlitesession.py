@@ -357,7 +357,10 @@ class SQLiteSession(APISession):
     def _write_block(self, r, sid, rid, lvl, bid, ext):
         blk = sqlite3.Binary(r.content)
         now = time.time()
-        self.dbcur.execute(SQL_TMPO_INS, (sid, rid, lvl, bid, ext, now, blk))
+        try:
+            self.dbcur.execute(SQL_TMPO_INS, (sid, rid, lvl, bid, ext, now, blk))
+        except sqlite3.IntegrityError:
+            pass
         self._clean(sid, rid, lvl, bid)
         self._dprintf(DBG_TMPO_WRITE, now, sid, rid, lvl, bid, len(blk))
 
