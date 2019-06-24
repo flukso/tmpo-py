@@ -75,7 +75,7 @@ setup(
 
     # List run-time dependencies here.  These will be installed by pip when
     # your project is installed. 
-    install_requires=['numpy', 'pandas', 'futures', 'requests_futures'],
+    install_requires=['numpy', 'pandas', 'futures', 'requests_futures', 'aiohttp'],
 
     # If there are data files included in your packages that need to be
     # installed, specify them here.  If using Python 2.6 or less, then these
@@ -83,6 +83,8 @@ setup(
     # Note: for creating the source distribution, they had to be included in the
     # MANIFEST.in as well. 
     package_data={
-        'tmpo': ['tmpo.ipynb', 'LICENSE', 'README.md'],
+        '': ['LICENSE', 'README.md'],
+        'tmpo': ['.flukso.crt'],
     },
+    include_package_data=True,
 )
