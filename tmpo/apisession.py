@@ -298,8 +298,8 @@ class APISession:
             "X-Token": token}
         params = {
             "rid": rid if rid else 0,
-            "lvl": lvl if rid else 0,
-            "bid": bid if rid else 0}
+            "lvl": lvl if lvl else 0,
+            "bid": bid if bid else 0}
         f = self.rqs.get(
             API_TMPO_SYNC % ("api.flukso.net", sid),
             headers=headers,
