@@ -254,6 +254,8 @@ class APISession:
     def _blk2series(self, ext, blk, head, tail):
         jblk = self._decompress_block(blk, ext)
         m = re.match(RE_JSON_BLK, jblk.decode("utf-8"))
+        if m is None:
+            return pd.Series()
         pdjblk = '{"index":%s,"data":%s}' % (m.group("t"), m.group("v"))
         try:
             pdsblk = pd.read_json(
