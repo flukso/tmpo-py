@@ -130,7 +130,7 @@ def dbcon(func):
 
 
 class SQLiteSession(APISession):
-    def __init__(self, path=None, workers=16):
+    def __init__(self, path=None, workers=16, cert=None):
         """
         Parameters
         ----------
@@ -139,7 +139,7 @@ class SQLiteSession(APISession):
         workers : int
             default 16
         """
-        super(SQLiteSession, self).__init__(workers=workers)
+        super(SQLiteSession, self).__init__(workers=workers, cert=cert)
 
         if path is None:
             path = os.path.expanduser("~") # $HOME

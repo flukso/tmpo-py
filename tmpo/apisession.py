@@ -25,7 +25,7 @@ class APISession:
     """
     Get Flukso Data (aka. TMPO Blocks) directly from the Flukso API
     """
-    def __init__(self, workers=16):
+    def __init__(self, workers=16, cert=None):
         """
         Parameters
         ----------
@@ -35,7 +35,10 @@ class APISession:
         self.debug = False
 
         package_dir = os.path.dirname(__file__)
-        self.crt = os.path.join(package_dir, ".flukso.crt")
+        if cert != False:
+            self.crt = os.path.join(package_dir, ".flukso.crt")
+        else:
+            self.crt = cert
         self.host = "api.flukso.net"
 
         self.rqs = requests_futures.sessions.FuturesSession(
@@ -263,7 +266,6 @@ class APISession:
                 typ="series",
                 dtype="float",
                 orient="split",
-                numpy=True,
                 date_unit="s")
         except:
             return pd.Series()
