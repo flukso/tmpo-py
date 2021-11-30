@@ -272,7 +272,15 @@ class APISession:
         h = json.loads(m.group("h"))
         self._npdelta(pdsblk.index, h["head"][0])
         self._npdelta(pdsblk, h["head"][1])
-        pdsblk_truncated = pdsblk.loc[head:tail]
+        pdsblk_truncated = pdjblk
+        try:
+            pdsblk_truncated = pdsblk_truncated.loc[head:]
+        except TypeError:
+            pass
+        try:
+            pdsblk_truncated = pdsblk_truncated.loc[:tail]
+        except TypeError:
+            pass
         return pdsblk_truncated
 
     def _decompress_block(self, blk, ext):
