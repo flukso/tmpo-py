@@ -1,5 +1,5 @@
 __title__ = "tmpo"
-__version__ = "0.3.6"
+__version__ = "0.3.7"
 __build__ = 0x000100
 __author__ = "Bart Van Der Meerssche"
 __license__ = "MIT"
